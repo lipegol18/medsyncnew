@@ -70,7 +70,9 @@
 
 @layer base {
   * {
+    /* 
     @apply border-border;
+     */
   }
 
   body {
@@ -89,7 +91,8 @@
   /* Estilos para formulários de autenticação que respondem ao tema */
   .auth-card input, 
   .auth-card select {
-    @apply bg-input border-border text-foreground;
+   /* @apply bg-input border-border text-foreground; */
+     
   }
   
   .auth-card input::placeholder {
@@ -171,7 +174,7 @@
   
   /* Card footer */
   .auth-card .bg-white {
-    @apply bg-card border-border;
+    /* @apply bg-card border-border; */
   }
   
   /* Estilos para os tabs */
