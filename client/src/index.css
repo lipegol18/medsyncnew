@@ -74,12 +74,12 @@
   }
 
   body {
-    @apply font-sans antialiased bg-background text-foreground;
+    /* @apply font-sans antialiased bg-background text-foreground; */
   }
   
   /* Estilos para a página de autenticação que respondem ao tema */
   .auth-page-container {
-    @apply bg-background;
+    /* @apply bg-background; */
   }
   
   .auth-card {
