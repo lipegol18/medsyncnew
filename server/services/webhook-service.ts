@@ -16,7 +16,7 @@ const WEBHOOK_URLS = {
 
 // Flag global para controlar se devemos forçar o modo de teste para todos os webhooks
 const FORCE_TEST_MODE = false; // Modo real ativado - os webhooks serão enviados
-
+const WEBHOOK_URL = process.env.WEBHOOK_URL;
 /**
  * Serviço para enviar notificações para o webhook externo
  * Implementado com tratamento de erro para não impactar a aplicação principal
