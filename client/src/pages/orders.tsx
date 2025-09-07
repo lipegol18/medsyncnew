@@ -83,13 +83,18 @@ export default function Orders() {
   const fetchAppointmentForOrder = async (orderId: number) => {
     try {
       const response = await apiRequest(`/api/surgery-appointments/by-medical-order/${orderId}`, "GET");
+      // A API agora retorna null quando não há agendamento ao invés de 404
       setAppointmentsByOrder(prev => ({
         ...prev,
         [orderId]: response
       }));
     } catch (error) {
-      // Se não encontrar agendamento, não fazer nada (pedido pode não ter agendamento)
-      console.log(`Nenhum agendamento encontrado para pedido ${orderId}`);
+      // Tratar erros reais da API (500, etc.) - não deve mais ocorrer 404
+      console.error(`Erro ao buscar agendamento para pedido ${orderId}:`, error);
+      setAppointmentsByOrder(prev => ({
+        ...prev,
+        [orderId]: null
+      }));
     }
   };
 
@@ -1069,7 +1074,7 @@ export default function Orders() {
                     )}
                     <Button
                       onClick={() => navigate("/create-order")}
-                      className="bg-sky-600 hover:bg-sky-700 text-white font-semibold"
+                      className="bg-medsync-blue hover:bg-medsync-blue-dark text-white font-semibold"
                     >
                       <Plus className="mr-2 h-4 w-4" />
                       Novo Pedido

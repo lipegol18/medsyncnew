@@ -42,6 +42,7 @@ import PedidosIcon from "@/assets/icons/pedidos-icon.svg";
 import PacienteIcon from "@/assets/icons/paciente-icon.svg";
 import AvatarCroped from "@/assets/Avatar_croped.png";
 import { TrialExpiredModal } from "@/components/trial/trial-expired-modal";
+import { ToastFilterTest } from "@/components/toast-filter-test";
 
 // Adicionar traduções para a página inicial
 const translations = {
@@ -236,7 +237,7 @@ export default function Home() {
 
         // Hook para pedidos aguardando envio
         const { pendingCount } = usePendingOrders();
-        const { toast } = useToast();
+        const { toast, presets, setFilterConfig, getFilterConfig } = useToast();
 
         // Estado para armazenar os pedidos
         const [orders, setOrders] = useState<any[]>([]);
@@ -585,7 +586,7 @@ export default function Home() {
                                                                                                                 (window.location.href =
                                                                                                                         "/create-order")
                                                                                                         }
-                                                                                                        className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 px-4 w-full bg-medsync-blue hover:bg-sky-700 text-white font-semibold py-3 h-12 text-base transition-all duration-200 flex-1 shadow-lg"
+                                                                                                        className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 px-4 w-full bg-medsync-blue hover:bg-medsync-blue-dark text-white font-semibold py-3 h-12 text-base transition-all duration-200 flex-1 shadow-lg"
                                                                                                 >
                                                                                                         <PlusCircle
                                                                                                                 size={
@@ -600,7 +601,7 @@ export default function Home() {
                                                                                                                 (window.location.href =
                                                                                                                         "/patients")
                                                                                                         }
-                                                                                                        className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 px-4 w-full bg-medsync-blue hover:bg-sky-700 text-white font-semibold py-3 h-12 text-base transition-all duration-200 flex-1 shadow-lg"
+                                                                                                        className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 px-4 w-full bg-medsync-blue hover:bg-medsync-blue-dark text-white font-semibold py-3 h-12 text-base transition-all duration-200 flex-1 shadow-lg"
                                                                                                 >
                                                                                                         <Users
                                                                                                                 size={
@@ -872,7 +873,7 @@ export default function Home() {
                                                         <CardFooter className="pt-4">
                                                                 <Button 
                                                                         onClick={() => navigate('/reports')}
-                                                                        className="w-full bg-sky-600 hover:bg-sky-700 text-white transition-colors duration-200"
+                                                                        className="w-full bg-medsync-blue hover:bg-medsync-blue-dark text-white transition-colors duration-200"
                                                                 >
                                                                         <BarChart className="h-4 w-4 mr-2" />
                                                                         {t("home.reports.button")}
