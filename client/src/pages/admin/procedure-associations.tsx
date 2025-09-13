@@ -111,6 +111,8 @@ export default function ProcedureAssociationsPage() {
   const [editingJustification, setEditingJustification] = useState<number | null>(null);
   const [justificationContent, setJustificationContent] = useState("");
   const [newJustificationContent, setNewJustificationContent] = useState("");
+  
+  // Estados removidos - campos agora são sempre editáveis
 
   const [formData, setFormData] = useState({
     procedureId: "",
@@ -601,6 +603,65 @@ export default function ProcedureAssociationsPage() {
       toast({
         title: "Sucesso",
         description: "Justificativa criada com sucesso!",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // === MUTATIONS PARA ATUALIZAR QUANTIDADES ===
+  const updateCbhpmQuantityMutation = useMutation({
+    mutationFn: async (data: { procedureId: number; approachId: number; cbhpmId: number; quantity: number }) => {
+      const response = await fetch(`/api/admin/approach-cbhpm/${data.procedureId}/${data.approachId}/${data.cbhpmId}/quantity`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ quantity: data.quantity }),
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Erro ao atualizar quantidade CBHPM');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/approach-details", selectedApproach, selectedProcedure] });
+      toast({
+        title: "Sucesso",
+        description: "Quantidade CBHPM atualizada com sucesso!",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateOpmeQuantityMutation = useMutation({
+    mutationFn: async (data: { procedureId: number; approachId: number; opmeId: number; quantity: number }) => {
+      const response = await fetch(`/api/admin/approach-opme/${data.procedureId}/${data.approachId}/${data.opmeId}/quantity`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ quantity: data.quantity }),
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Erro ao atualizar quantidade OPME');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/approach-details", selectedApproach, selectedProcedure] });
+      toast({
+        title: "Sucesso",
+        description: "Quantidade OPME atualizada com sucesso!",
       });
     },
     onError: (error: Error) => {
@@ -1627,12 +1688,34 @@ export default function ProcedureAssociationsPage() {
                                   <div>
                                     <div className="font-medium text-sm">{proc.code}</div>
                                     <div className="text-xs text-muted-foreground mt-1">{proc.name}</div>
-                                    <div className="flex gap-2 mt-2">
-                                      {proc.quantity && (
-                                        <span className="inline-block px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded">
-                                          Qtd: {proc.quantity}
-                                        </span>
-                                      )}
+                                    <div className="flex gap-2 mt-2 items-center">
+                                      {/* Campo sempre editável de quantidade CBHPM */}
+                                      <div className="flex items-center gap-1">
+                                        <span className="text-xs text-purple-800">Qtd:</span>
+                                        <Input
+                                          type="number"
+                                          min="1"
+                                          className="w-16 h-6 text-xs"
+                                          defaultValue={proc.quantity || 1}
+                                          onBlur={(e) => {
+                                            const newQuantity = parseInt(e.target.value) || 1;
+                                            if (newQuantity !== (proc.quantity || 1) && selectedApproach && selectedProcedure) {
+                                              updateCbhpmQuantityMutation.mutate({
+                                                procedureId: selectedProcedure,
+                                                approachId: selectedApproach,
+                                                cbhpmId: proc.id,
+                                                quantity: newQuantity
+                                              });
+                                            }
+                                          }}
+                                          onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                              e.currentTarget.blur();
+                                            }
+                                          }}
+                                          disabled={updateCbhpmQuantityMutation.isPending}
+                                        />
+                                      </div>
                                       {proc.porte && (
                                         <span className="inline-block px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded">
                                           Porte: {proc.porte}
@@ -1753,12 +1836,34 @@ export default function ProcedureAssociationsPage() {
                                     {opme.commercialName && (
                                       <div className="text-xs text-muted-foreground mt-1">{opme.commercialName}</div>
                                     )}
-                                    <div className="flex gap-2 mt-2">
-                                      {opme.quantity && (
-                                        <span className="inline-block px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded">
-                                          Qtd: {opme.quantity}
-                                        </span>
-                                      )}
+                                    <div className="flex gap-2 mt-2 items-center flex-wrap">
+                                      {/* Campo sempre editável de quantidade OPME */}
+                                      <div className="flex items-center gap-1">
+                                        <span className="text-xs text-orange-800">Qtd:</span>
+                                        <Input
+                                          type="number"
+                                          min="1"
+                                          className="w-16 h-6 text-xs"
+                                          defaultValue={opme.quantity || 1}
+                                          onBlur={(e) => {
+                                            const newQuantity = parseInt(e.target.value) || 1;
+                                            if (newQuantity !== (opme.quantity || 1) && selectedApproach && selectedProcedure) {
+                                              updateOpmeQuantityMutation.mutate({
+                                                procedureId: selectedProcedure,
+                                                approachId: selectedApproach,
+                                                opmeId: opme.id,
+                                                quantity: newQuantity
+                                              });
+                                            }
+                                          }}
+                                          onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                              e.currentTarget.blur();
+                                            }
+                                          }}
+                                          disabled={updateOpmeQuantityMutation.isPending}
+                                        />
+                                      </div>
                                       {opme.isRequired && (
                                         <span className="inline-block px-2 py-1 bg-red-100 text-red-800 text-xs rounded">
                                           Obrigatório
