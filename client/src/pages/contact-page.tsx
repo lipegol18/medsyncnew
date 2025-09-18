@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { ExternalLink, ArrowLeft } from "lucide-react";
 import { FaWhatsapp } from "react-icons/fa";
+import { openWhatsAppChat } from "@/lib/whatsapp";
 import { useLocation } from "wouter";
 
 export default function ContactPage() {
@@ -46,7 +47,7 @@ export default function ContactPage() {
                   type="button"
                   variant="outline"
                   className="mt-2 flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white border-green-700"
-                  onClick={() => window.open("https://wa.me/5521997364870", "_blank")}
+                  onClick={() => openWhatsAppChat("5521997364870", "Olá! Gostaria de saber mais sobre o MedSync.")}
                 >
                   <FaWhatsapp className="h-5 w-5" />
                   {t("contact.whatsapp.description")}
