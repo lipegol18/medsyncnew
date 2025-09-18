@@ -36,10 +36,12 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Search, Plus, Edit, Trash2, Link2, Settings, X } from "lucide-react";
+import { Search, Plus, Edit, Trash2, Link2, Settings, X, Copy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
 import { CreateProcedureModal } from "@/components/CreateProcedureModal";
+import { CreateApproachModal } from "@/components/CreateApproachModal";
+import CloneAssociationsModal from "@/components/CloneAssociationsModal";
 
 type AnatomicalRegion = {
   id: number;
@@ -82,9 +84,12 @@ export default function ProcedureAssociationsPage() {
   const [selectedProcedure, setSelectedProcedure] = useState<number | null>(null);
   const [selectedApproach, setSelectedApproach] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [approachSearchTerm, setApproachSearchTerm] = useState("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isCreateProcedureModalOpen, setIsCreateProcedureModalOpen] = useState(false);
+  const [isCreateApproachModalOpen, setIsCreateApproachModalOpen] = useState(false);
+  const [isCloneModalOpen, setIsCloneModalOpen] = useState(false);
   
   // Estados para busca de associações
   const [cidSearchTerm, setCidSearchTerm] = useState("");
@@ -111,6 +116,8 @@ export default function ProcedureAssociationsPage() {
   const [editingJustification, setEditingJustification] = useState<number | null>(null);
   const [justificationContent, setJustificationContent] = useState("");
   const [newJustificationContent, setNewJustificationContent] = useState("");
+  
+  // Estados removidos - campos agora são sempre editáveis
 
   const [formData, setFormData] = useState({
     procedureId: "",
@@ -612,6 +619,65 @@ export default function ProcedureAssociationsPage() {
     },
   });
 
+  // === MUTATIONS PARA ATUALIZAR QUANTIDADES ===
+  const updateCbhpmQuantityMutation = useMutation({
+    mutationFn: async (data: { procedureId: number; approachId: number; cbhpmId: number; quantity: number }) => {
+      const response = await fetch(`/api/admin/approach-cbhpm/${data.procedureId}/${data.approachId}/${data.cbhpmId}/quantity`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ quantity: data.quantity }),
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Erro ao atualizar quantidade CBHPM');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/approach-details", selectedApproach, selectedProcedure] });
+      toast({
+        title: "Sucesso",
+        description: "Quantidade CBHPM atualizada com sucesso!",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateOpmeQuantityMutation = useMutation({
+    mutationFn: async (data: { procedureId: number; approachId: number; opmeId: number; quantity: number }) => {
+      const response = await fetch(`/api/admin/approach-opme/${data.procedureId}/${data.approachId}/${data.opmeId}/quantity`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ quantity: data.quantity }),
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Erro ao atualizar quantidade OPME');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/approach-details", selectedApproach, selectedProcedure] });
+      toast({
+        title: "Sucesso",
+        description: "Quantidade OPME atualizada com sucesso!",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   // === FUNÇÕES DE BUSCA COM DEBOUNCE ===
   
   // Função para formatar automaticamente o código CID-10
@@ -995,6 +1061,14 @@ export default function ProcedureAssociationsPage() {
     proc.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const filteredApproaches = (approaches as SurgicalApproach[])
+    .filter((approach: SurgicalApproach) =>
+      approach.name.toLowerCase().includes(approachSearchTerm.toLowerCase())
+    )
+    .filter((approach: SurgicalApproach) => 
+      !procedureApproaches?.some((pa: any) => pa.id === approach.id)
+    );
+
   const selectedProcedureData = (procedures as SurgicalProcedure[]).find((p: SurgicalProcedure) => p.id === selectedProcedure);
 
   return (
@@ -1295,39 +1369,65 @@ export default function ProcedureAssociationsPage() {
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      {/* Campo para adicionar nova conduta */}
-                      <div className="flex items-center gap-4">
-                        <div className="flex-1">
-                          <Label htmlFor="approach-select">Adicionar Conduta Cirúrgica</Label>
-                          <Select
-                            value=""
-                            onValueChange={(value) => {
-                              if (selectedProcedure && value !== "none") {
-                                addApproachMutation.mutate({
-                                  procedureId: selectedProcedure,
-                                  approachId: parseInt(value)
-                                });
-                              }
-                            }}
-                            disabled={addApproachMutation.isPending || !selectedProcedure}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Escolha uma conduta para adicionar..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="none">Selecione uma conduta</SelectItem>
-                              {(approaches as any[])
-                                .filter((approach: any) => 
-                                  !procedureApproaches?.some((pa: any) => pa.id === approach.id)
-                                )
-                                .map((approach: any) => (
-                                  <SelectItem key={approach.id} value={approach.id.toString()}>
-                                    {approach.name}
-                                  </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                      {/* Campo de busca para adicionar nova conduta */}
+                      <div>
+                        <Label htmlFor="approach-search">Buscar e Adicionar Condutas Cirúrgicas</Label>
+                        <div className="flex items-center space-x-2 mt-2">
+                          <Search className="h-4 w-4 text-muted-foreground" />
+                          <Input
+                            id="approach-search"
+                            placeholder="Buscar condutas para adicionar..."
+                            value={approachSearchTerm}
+                            onChange={(e) => setApproachSearchTerm(e.target.value)}
+                            disabled={!selectedProcedure}
+                          />
                         </div>
+                        {approachSearchTerm && (
+                          <div className="mt-2 max-h-48 overflow-y-auto border rounded">
+                            {filteredApproaches.length > 0 ? (
+                              filteredApproaches.map((approach: SurgicalApproach) => (
+                                <div
+                                  key={approach.id}
+                                  className="p-3 hover:bg-muted cursor-pointer border-b last:border-b-0 transition-colors"
+                                  onClick={() => {
+                                    if (selectedProcedure) {
+                                      addApproachMutation.mutate({
+                                        procedureId: selectedProcedure,
+                                        approachId: approach.id
+                                      }, {
+                                        onSuccess: () => {
+                                          setApproachSearchTerm("");
+                                        }
+                                      });
+                                    }
+                                  }}
+                                >
+                                  <div className="font-medium">{approach.name}</div>
+                                  {approach.description && (
+                                    <div className="text-sm text-muted-foreground">
+                                      {approach.description}
+                                    </div>
+                                  )}
+                                </div>
+                              ))
+                            ) : (
+                              <div className="p-4 text-center">
+                                <div className="text-muted-foreground mb-2">
+                                  Nenhuma conduta encontrada para "{approachSearchTerm}"
+                                </div>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  onClick={() => setIsCreateApproachModalOpen(true)}
+                                  disabled={addApproachMutation.isPending}
+                                >
+                                  <Plus className="mr-2 h-4 w-4" />
+                                  Criar Nova Conduta
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                       
                       {/* Mostrar condutas associadas */}
@@ -1404,13 +1504,24 @@ export default function ProcedureAssociationsPage() {
                       <h3 className="text-lg font-semibold">
                         Detalhes da Conduta: {procedureApproaches?.find((a: any) => a.id === selectedApproach)?.name}
                       </h3>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setSelectedApproach(null)}
-                      >
-                        Fechar
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setIsCloneModalOpen(true)}
+                          data-testid="button-clone-approach-associations"
+                        >
+                          <Copy className="w-4 h-4 mr-2" />
+                          Clonar Associações
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setSelectedApproach(null)}
+                        >
+                          Fechar
+                        </Button>
+                      </div>
                     </div>
 
 
@@ -1627,12 +1738,34 @@ export default function ProcedureAssociationsPage() {
                                   <div>
                                     <div className="font-medium text-sm">{proc.code}</div>
                                     <div className="text-xs text-muted-foreground mt-1">{proc.name}</div>
-                                    <div className="flex gap-2 mt-2">
-                                      {proc.quantity && (
-                                        <span className="inline-block px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded">
-                                          Qtd: {proc.quantity}
-                                        </span>
-                                      )}
+                                    <div className="flex gap-2 mt-2 items-center">
+                                      {/* Campo sempre editável de quantidade CBHPM */}
+                                      <div className="flex items-center gap-1">
+                                        <span className="text-xs text-purple-800">Qtd:</span>
+                                        <Input
+                                          type="number"
+                                          min="1"
+                                          className="w-16 h-6 text-xs"
+                                          defaultValue={proc.quantity || 1}
+                                          onBlur={(e) => {
+                                            const newQuantity = parseInt(e.target.value) || 1;
+                                            if (newQuantity !== (proc.quantity || 1) && selectedApproach && selectedProcedure) {
+                                              updateCbhpmQuantityMutation.mutate({
+                                                procedureId: selectedProcedure,
+                                                approachId: selectedApproach,
+                                                cbhpmId: proc.id,
+                                                quantity: newQuantity
+                                              });
+                                            }
+                                          }}
+                                          onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                              e.currentTarget.blur();
+                                            }
+                                          }}
+                                          disabled={updateCbhpmQuantityMutation.isPending}
+                                        />
+                                      </div>
                                       {proc.porte && (
                                         <span className="inline-block px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded">
                                           Porte: {proc.porte}
@@ -1753,12 +1886,34 @@ export default function ProcedureAssociationsPage() {
                                     {opme.commercialName && (
                                       <div className="text-xs text-muted-foreground mt-1">{opme.commercialName}</div>
                                     )}
-                                    <div className="flex gap-2 mt-2">
-                                      {opme.quantity && (
-                                        <span className="inline-block px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded">
-                                          Qtd: {opme.quantity}
-                                        </span>
-                                      )}
+                                    <div className="flex gap-2 mt-2 items-center flex-wrap">
+                                      {/* Campo sempre editável de quantidade OPME */}
+                                      <div className="flex items-center gap-1">
+                                        <span className="text-xs text-orange-800">Qtd:</span>
+                                        <Input
+                                          type="number"
+                                          min="1"
+                                          className="w-16 h-6 text-xs"
+                                          defaultValue={opme.quantity || 1}
+                                          onBlur={(e) => {
+                                            const newQuantity = parseInt(e.target.value) || 1;
+                                            if (newQuantity !== (opme.quantity || 1) && selectedApproach && selectedProcedure) {
+                                              updateOpmeQuantityMutation.mutate({
+                                                procedureId: selectedProcedure,
+                                                approachId: selectedApproach,
+                                                opmeId: opme.id,
+                                                quantity: newQuantity
+                                              });
+                                            }
+                                          }}
+                                          onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                              e.currentTarget.blur();
+                                            }
+                                          }}
+                                          disabled={updateOpmeQuantityMutation.isPending}
+                                        />
+                                      </div>
                                       {opme.isRequired && (
                                         <span className="inline-block px-2 py-1 bg-red-100 text-red-800 text-xs rounded">
                                           Obrigatório
@@ -2123,6 +2278,44 @@ export default function ProcedureAssociationsPage() {
           
           // Limpar termo de busca para mostrar o novo procedimento
           setSearchTerm("");
+        }}
+      />
+
+      {/* Modal para criar nova conduta */}
+      <CreateApproachModal
+        isOpen={isCreateApproachModalOpen}
+        onOpenChange={setIsCreateApproachModalOpen}
+        onSuccess={(createdApproach) => {
+          // Invalidar query para atualizar a lista
+          queryClient.invalidateQueries({ queryKey: ["/api/admin/surgical-approaches"] });
+          
+          // Se há um procedimento selecionado, associar automaticamente a nova conduta
+          if (selectedProcedure && createdApproach) {
+            addApproachMutation.mutate({
+              procedureId: selectedProcedure,
+              approachId: createdApproach.id
+            }, {
+              onSuccess: () => {
+                // Limpar termo de busca para mostrar a nova conduta associada
+                setApproachSearchTerm("");
+              }
+            });
+          }
+        }}
+      />
+
+      {/* Modal para clonar associações */}
+      <CloneAssociationsModal
+        isOpen={isCloneModalOpen}
+        onOpenChange={setIsCloneModalOpen}
+        sourceProcedureId={selectedProcedure}
+        sourceApproachId={selectedApproach}
+        approaches={procedureApproaches || []}
+        onSuccess={() => {
+          // Atualizar as queries após clonagem bem-sucedida
+          queryClient.invalidateQueries({ queryKey: ["/api/admin/procedure-associations"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/admin/procedure-approaches"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/admin/procedure-regions"] });
         }}
       />
 
