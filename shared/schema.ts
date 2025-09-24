@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, date, timestamp, pgEnum, numeric, varchar, jsonb, unique, check, index } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, date, timestamp, pgEnum, numeric, varchar, jsonb, unique, check, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations, sql } from "drizzle-orm";
@@ -549,8 +549,6 @@ export const insertOrderStatusSchema = createInsertSchema(orderStatuses);
 export type OrderStatus = typeof orderStatuses.$inferSelect;
 export type InsertOrderStatus = z.infer<typeof insertOrderStatusSchema>;
 
-// Manter enum para compatibilidade (deprecated) - atualizado com novos status
-export const orderStatusEnum = pgEnum("order_status", ["em_preenchimento", "em_avaliacao", "aceito", "autorizado_parcial", "cirurgia_realizada", "cancelado"]);
 
 // Enum para tipo de procedimento
 export const procedureTypeEnum = pgEnum("procedure_type", ["eletiva", "urgencia"]);
@@ -888,15 +886,6 @@ export const userSubscriptions = pgTable("user_subscriptions", {
   paymentProviderSubscriptionId: text("payment_provider_subscription_id"), // ID da assinatura na plataforma
   paymentProvider: text("payment_provider").default("none"), // "stripe", "pagar_me", "mercado_pago", etc.
   
-  // Campos específicos do Stripe Checkout Session
-  checkoutSessionId: text("checkout_session_id"), // ID da sessão de checkout do Stripe
-  checkoutCreatedAt: timestamp("checkout_created_at"), // Data de criação da sessão (session.created)
-  checkoutExpiresAt: timestamp("checkout_expires_at"), // Data de expiração da sessão (session.expires_at)
-  amountTotal: integer("amount_total"), // Valor total pago em centavos (session.amount_total)
-  currency: text("currency").default("BRL"), // Moeda utilizada (session.currency)
-  paymentStatus: text("payment_status"), // Status do pagamento (session.payment_status)
-  billingInterval: text("billing_interval"), // "monthly" ou "yearly" - tipo de cobrança
-  
   // Campos de timestamps
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -920,13 +909,6 @@ export const insertUserSubscriptionSchema = createInsertSchema(userSubscriptions
   paymentProviderCustomerId: true,
   paymentProviderSubscriptionId: true,
   paymentProvider: true,
-  checkoutSessionId: true,
-  checkoutCreatedAt: true,
-  checkoutExpiresAt: true,
-  amountTotal: true,
-  currency: true,
-  paymentStatus: true,
-  billingInterval: true,
 });
 
 // Enum para status do lead
@@ -1109,18 +1091,24 @@ export const discountCodes = pgTable("discount_codes", {
   validUntil: timestamp("valid_until"),
   applicablePlans: integer("applicable_plans").array(), // Array de IDs de planos aplicáveis, NULL = todos
   isActive: boolean("is_active").default(true),
+  isAutomatic: boolean("is_automatic"), // Apenas um desconto pode ser automático por vez
   
-  // === Campos específicos para integração com provedores de pagamento ===
+  // === Campos genéricos para integração com provedores de pagamento ===
   paymentProvider: text("payment_provider").default("internal"), // "stripe", "mercado_pago", "internal", etc.
   
-  // Campos específicos do Stripe
-  stripeCouponId: text("stripe_coupon_id").unique(), // ID do cupom no Stripe
-  stripePromotionCodeId: text("stripe_promotion_code_id").unique(), // ID do promotion code no Stripe
-  stripeCustomerRestrictions: text("stripe_customer_restrictions").array(), // IDs de clientes permitidos
-  stripeFirstTimeTransaction: boolean("stripe_first_time_transaction").default(false), // Apenas primeira transação
-  stripeMinimumAmount: integer("stripe_minimum_amount"), // Valor mínimo em centavos
-  stripeMaxRedemptions: integer("stripe_max_redemptions"), // Máximo de redeem no Stripe
-  stripeRedeemBy: timestamp("stripe_redeem_by"), // Data limite para uso no Stripe
+  // Campos genéricos de referência externa
+  externalCouponId: text("external_coupon_id").unique(), // ID do cupom no provedor externo
+  externalPromotionCodeId: text("external_promotion_code_id").unique(), // ID do promotion code no provedor
+  customerRestrictions: text("customer_restrictions").array(), // IDs de clientes permitidos
+  firstTimeTransaction: boolean("first_time_transaction").default(false), // Apenas primeira transação
+  minimumAmount: integer("minimum_amount"), // Valor mínimo em centavos
+  maxRedemptions: integer("max_redemptions"), // Máximo de redenções
+  redeemBy: timestamp("redeem_by"), // Data limite para uso
+  
+  // Campos de duração do cupom (para assinaturas)
+  duration: text("duration").default("once"), // "once", "repeating", "forever"
+  durationInMonths: integer("duration_in_months"), // Duração em meses (se duration = 'repeating')
+  providerName: text("provider_name"), // Nome do cupom no provedor
   
   // Campos de metadata flexíveis
   metadata: text("metadata"), // JSON string para dados adicionais
@@ -1134,7 +1122,13 @@ export const discountCodes = pgTable("discount_codes", {
   
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => ({
+  // Garante que apenas um desconto pode ser automático por vez
+  // Permite múltiplos NULL/FALSE, mas apenas um TRUE
+  automaticTrueOnly: uniqueIndex("discount_codes_is_automatic_true")
+    .on(table.isAutomatic)
+    .where(sql`is_automatic IS TRUE`),
+}));
 
 export const insertDiscountCodeSchema = createInsertSchema(discountCodes).pick({
   code: true,
@@ -1146,14 +1140,18 @@ export const insertDiscountCodeSchema = createInsertSchema(discountCodes).pick({
   validUntil: true,
   applicablePlans: true,
   isActive: true,
+  isAutomatic: true,
   paymentProvider: true,
-  stripeCouponId: true,
-  stripePromotionCodeId: true,
-  stripeCustomerRestrictions: true,
-  stripeFirstTimeTransaction: true,
-  stripeMinimumAmount: true,
-  stripeMaxRedemptions: true,
-  stripeRedeemBy: true,
+  externalCouponId: true,
+  externalPromotionCodeId: true,
+  customerRestrictions: true,
+  firstTimeTransaction: true,
+  minimumAmount: true,
+  maxRedemptions: true,
+  redeemBy: true,
+  duration: true,
+  durationInMonths: true,
+  providerName: true,
   metadata: true,
   restrictions: true,
   createdBy: true,
