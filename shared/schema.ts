@@ -1341,11 +1341,6 @@ export type InsertWebhookEvent = z.infer<typeof insertWebhookEventSchema>;
 export type SubscriptionPayment = typeof subscriptionPayments.$inferSelect;
 export type InsertSubscriptionPayment = z.infer<typeof insertSubscriptionPaymentSchema>;
 
-
-
-export type DiscountCode = typeof discountCodes.$inferSelect;
-export type InsertDiscountCode = z.infer<typeof insertDiscountCodeSchema>;
-
 export type Role = typeof roles.$inferSelect;
 export type InsertRole = z.infer<typeof insertRoleSchema>;
 
