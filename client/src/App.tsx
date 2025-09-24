@@ -23,9 +23,20 @@ import Notifications from "@/pages/notifications";
 import ContactPage from "@/pages/contact-page";
 import ContactMessages from "@/pages/admin/contact-messages";
 import ManufacturerDemo from "@/pages/manufacturer-demo";
+import FontDemo from "@/pages/font-demo";
+import SubscriptionPlans from "@/pages/subscription-plans";
+import Checkout from "@/pages/checkout";
+import CheckoutSuccess from "@/pages/checkout-success";
+import CheckoutCancel from "@/pages/checkout-cancel";
+import StripeTest from "@/pages/stripe-test";
 
 import OpmeMaterials from "@/pages/admin/opme-materials";
 import CidCodes from "@/pages/admin/cid-codes";
+import SurgicalProcedures from "@/pages/admin/surgical-procedures";
+import SurgicalApproaches from "@/pages/admin/surgical-approaches";
+import ProcedureAssociations from "@/pages/admin/procedure-associations";
+import AdminSubscriptionPlans from "@/pages/admin/subscription-plans";
+import AdminDiscountCodes from "@/pages/admin/discount-codes";
 import TestOrderPreview from "@/pages/test-order-preview";
 
 import { useEffect } from "react";
@@ -63,8 +74,24 @@ function Router() {
 
       <ProtectedRoute path="/admin/opme-materials" component={OpmeMaterials} />
       <ProtectedRoute path="/admin/cid-codes" component={CidCodes} />
+      <ProtectedRoute path="/admin/surgical-procedures" component={SurgicalProcedures} />
+      <ProtectedRoute path="/admin/surgical-approaches" component={SurgicalApproaches} />
+      <ProtectedRoute path="/admin/procedure-associations" component={ProcedureAssociations} />
+      <ProtectedRoute path="/admin/subscription-plans" component={AdminSubscriptionPlans} />
+      <ProtectedRoute path="/admin/discount-codes" component={AdminDiscountCodes} />
       <ProtectedRoute path="/test-order-preview" component={TestOrderPreview} />
       <ProtectedRoute path="/manufacturer-demo" component={ManufacturerDemo} />
+      <ProtectedRoute path="/font-demo" component={FontDemo} />
+      
+      {/* Subscription and Payment Routes */}
+      <ProtectedRoute path="/subscription-plans" component={SubscriptionPlans} />
+      <ProtectedRoute path="/checkout" component={Checkout} />
+      
+      {/* Checkout success/cancel pages - não precisam de autenticação */}
+      <Route path="/checkout/success" component={CheckoutSuccess} />
+      <Route path="/checkout/cancel" component={CheckoutCancel} />
+      
+      <ProtectedRoute path="/stripe-test" component={StripeTest} />
 
       <Route path="/auth" component={AuthPage} />
       <Route path="/contact" component={ContactPage} />
@@ -81,7 +108,7 @@ function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider defaultTheme="dark" storageKey="medsync-theme">
+      <ThemeProvider defaultTheme="light" storageKey="medsync-theme-v2">
         <TooltipProvider>
           <AuthProvider>
             <ConsentProvider>
