@@ -2219,23 +2219,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const hospital = order.hospitalId
               ? await storage.getHospital(order.hospitalId)
               : null;
-            const doctor = order.doctorId
-              ? await storage.getUser(order.doctorId)
+            const doctor = order.userId
+              ? await storage.getUser(order.userId)
               : null;
-            const procedure = order.procedureCbhpmId
-              ? await storage.getProcedure(order.procedureCbhpmId)
-              : null;
+            // Procedure relationship no longer available directly
+            const procedure = null;
 
             return {
               id: order.id,
               patientName: patient
                 ? patient.fullName
                 : "Paciente não encontrado",
-              procedureName: procedure
-                ? procedure.name
-                : order.procedureName || "Não especificado",
+              procedureName: "Não especificado",
               hospital: hospital ? hospital.name : "Hospital não encontrado",
-              status: order.status || "não_especificado",
+              status: "não_especificado",
               date: order.createdAt
                 ? new Date(order.createdAt).toISOString().split("T")[0]
                 : "Data não disponível",
@@ -2243,9 +2240,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 order.complexity || procedure?.porte || "não_especificada",
               doctor: doctor ? doctor.name : req.user?.name || "Usuário atual",
               // Valor só é visível para administradores
-              value: isAdmin
-                ? order.totalValue || procedure?.custoOperacional || null
-                : null,
+              value: null,
             };
           }),
         );
@@ -2324,9 +2319,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               ? await storage.getHospital(order.hospitalId)
               : null;
               
-            const procedure = order.procedureCbhpmId
-              ? await storage.getProcedure(order.procedureCbhpmId)
-              : null;
+            // Procedure relationship no longer available directly
+            const procedure = null;
               
             const user = order.userId
               ? await storage.getUser(order.userId)
@@ -3556,8 +3550,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user?.id;
       const isAdmin = req.user?.roleId === 1;
       
+      // Extrair filtros da query string
+      const startDate = req.query.startDate as string;
+      const endDate = req.query.endDate as string;
+      const statusFilter = req.query.status as string;
+      const hospitalIdFilter = req.query.hospitalId as string;
+      
       console.log(`=== HOSPITAL-DISTRIBUTION-WORKING - CIRURGIAS POR HOSPITAL ===`);
       console.log(`Usuário ID: ${userId}, É Admin: ${isAdmin}`);
+      console.log(`Filtros aplicados:`, { startDate, endDate, statusFilter, hospitalIdFilter });
       
       // Se não há usuário autenticado, retornar array vazio
       if (!userId) {
@@ -3567,39 +3568,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       let query: string;
       let params: any[] = [];
+      let whereConditions: string[] = [];
+      
+      // Condição base: excluir pedidos incompletos
+      whereConditions.push("mo.status_id != 1");
       
       if (isAdmin) {
-        // Admin vê todas as cirurgias (exceto incompletas)
-        query = `
-          SELECT 
-            TRIM(COALESCE(h.name, 'Hospital não especificado')) as hospitalName,
-            COUNT(*) as surgeryCount
-          FROM 
-            medical_orders mo
-          LEFT JOIN 
-            hospitals h ON mo.hospital_id = h.id
-          WHERE mo.status_id != 1
-          GROUP BY h.name
-          ORDER BY COUNT(*) DESC
-          LIMIT 10
-        `;
+        // Admin pode ver todas as cirurgias, mas ainda aplicamos filtros específicos
+        console.log("Usuário é admin - vendo todas as cirurgias");
       } else {
-        // Médicos veem apenas suas próprias cirurgias (exceto incompletas)
-        query = `
-          SELECT 
-            TRIM(COALESCE(h.name, 'Hospital não especificado')) as hospitalName,
-            COUNT(*) as surgeryCount
-          FROM 
-            medical_orders mo
-          LEFT JOIN 
-            hospitals h ON mo.hospital_id = h.id
-          WHERE mo.user_id = $1 AND mo.status_id != 1
-          GROUP BY h.name
-          ORDER BY COUNT(*) DESC
-          LIMIT 10
-        `;
-        params = [userId];
+        // Médico vê apenas suas próprias cirurgias
+        whereConditions.push(`mo.user_id = $${params.length + 1}`);
+        params.push(userId);
       }
+      
+      // Aplicar filtro de data de início
+      if (startDate) {
+        whereConditions.push(`mo.created_at >= $${params.length + 1}`);
+        params.push(startDate);
+        console.log(`Filtro data início aplicado: ${startDate}`);
+      }
+      
+      // Aplicar filtro de data de fim
+      if (endDate) {
+        whereConditions.push(`mo.created_at <= $${params.length + 1}`);
+        params.push(endDate + ' 23:59:59'); // Incluir o dia inteiro
+        console.log(`Filtro data fim aplicado: ${endDate}`);
+      }
+      
+      // Aplicar filtro de hospital específico
+      if (hospitalIdFilter && hospitalIdFilter !== 'all') {
+        whereConditions.push(`mo.hospital_id = $${params.length + 1}`);
+        params.push(parseInt(hospitalIdFilter));
+        console.log(`Filtro hospital aplicado: ${hospitalIdFilter}`);
+      }
+      
+      // Construir a query com as condições WHERE
+      query = `
+        SELECT 
+          TRIM(COALESCE(h.name, 'Hospital não especificado')) as hospitalName,
+          COUNT(*) as surgeryCount
+        FROM 
+          medical_orders mo
+        LEFT JOIN 
+          hospitals h ON mo.hospital_id = h.id
+        WHERE ${whereConditions.join(' AND ')}
+        GROUP BY h.name
+        ORDER BY COUNT(*) DESC
+        LIMIT 10
+      `;
       
       console.log(`Query cirurgias por hospital: ${query}`);
       console.log(`Parâmetros: ${JSON.stringify(params)}`);
@@ -4899,13 +4916,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Filtrar planos baseado no termo de busca
         const filteredPlans = allPlans.filter(plan => {
-          // Busca por nome comercial (normalizado)
-          const commercialNameMatch = normalizeText(plan.commercialName).includes(normalizedTerm);
+          // Busca por nome do plano (normalizado)
+          const planNameMatch = normalizeText(plan.nmPlano || '').includes(normalizedTerm);
           
           // Busca por código do plano (exato, sem normalização como solicitado)
           const planCodeMatch = plan.cdPlano.includes(searchTerm);
           
-          return commercialNameMatch || planCodeMatch;
+          return planNameMatch || planCodeMatch;
         }).slice(0, 50); // Limitar a 50 resultados
 
         console.log(
@@ -6526,9 +6543,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const user = order.userId
               ? await storage.getUser(order.userId)
               : null;
-            const procedure = order.procedureCbhpmId
-              ? await storage.getProcedure(order.procedureCbhpmId)
-              : null;
+            // Procedure relationship no longer available directly
+            const procedure = null;
 
             return {
               id: order.id,
@@ -6537,9 +6553,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               patientPhone: patient ? patient.phone : null,
               hospitalId: order.hospitalId,
               hospitalName: hospital ? hospital.name : "Hospital não encontrado",
-              procedureName: procedure
-                ? procedure.name
-                : order.procedureName || "Não especificado",
+              procedureName: "Não especificado",
               status: order.statusCode || "não_especificado",
               createdAt: order.createdAt,
               updatedAt: order.updatedAt,
@@ -6667,33 +6681,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           techniques.push('não_especificado'); // Pode ser ajustado conforme necessário
         }
         
-        // Verificar procedimentos secundários
-        if (order.secondaryProcedureIds && Array.isArray(order.secondaryProcedureIds) && order.secondaryProcedureIds.length > 0) {
-          console.log(`Buscando procedimentos secundários: ${order.secondaryProcedureIds.join(', ')}`);
-          
-          for (let i = 0; i < order.secondaryProcedureIds.length; i++) {
-            const procedureId = order.secondaryProcedureIds[i];
-            try {
-              const procData = await storage.getProcedure(procedureId);
-              if (procData) {
-                procedureIds.push(procData.id);
-                procedureNames.push(procData.name);
-                procedureCodes.push(procData.code);
-                
-                // Buscar dados relacionados aos procedimentos secundários
-                const laterality = order.secondaryProcedureLateralities && order.secondaryProcedureLateralities[i] 
-                  ? order.secondaryProcedureLateralities[i] 
-                  : 'não_especificado';
-                
-                procedureSides.push(laterality);
-                accessRoutes.push('não_especificado'); // Pode ser ajustado conforme necessário
-                techniques.push('não_especificado'); // Pode ser ajustado conforme necessário
-              }
-            } catch (err) {
-              console.error(`Erro ao buscar procedimento ${procedureId}:`, err);
-            }
-          }
-        }
+        // Secondary procedures are no longer supported in current schema
+        // TODO: Implement secondary procedures with new schema structure
         
         // Buscar materiais OPME
         let opmeItemIds = [];
@@ -6703,45 +6692,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         let opmeItemUnits = [];
         let opmeItemSuppliers = [];
         
-        // Verificar materiais OPME se existirem
-        if (order.opmeItemIds && Array.isArray(order.opmeItemIds) && order.opmeItemIds.length > 0) {
-          console.log(`Buscando materiais OPME: ${order.opmeItemIds.join(', ')}`);
-          
-          for (let i = 0; i < order.opmeItemIds.length; i++) {
-            const opmeItemId = order.opmeItemIds[i];
-            try {
-              const opmeItem = await storage.getOpmeItem(opmeItemId);
-              if (opmeItem) {
-                opmeItemIds.push(opmeItem.id);
-                opmeItemNames.push(opmeItem.name);
-                opmeItemCodes.push(opmeItem.code || 'sem código');
-                
-                // Obter quantidade e unidade
-                const quantity = order.opmeItemQuantities && order.opmeItemQuantities[i] 
-                  ? order.opmeItemQuantities[i] 
-                  : 1;
-                
-                opmeItemQuantities.push(quantity);
-                opmeItemUnits.push(opmeItem.unit || 'unidade');
-                
-                // Buscar fornecedor se existir
-                if (order.opmeSupplierIds && order.opmeSupplierIds[i]) {
-                  try {
-                    const supplier = await storage.getSupplier(order.opmeSupplierIds[i]);
-                    opmeItemSuppliers.push(supplier ? supplier.companyName : 'Fornecedor não especificado');
-                  } catch (err) {
-                    console.error(`Erro ao buscar fornecedor para OPME ${opmeItemId}:`, err);
-                    opmeItemSuppliers.push('Fornecedor não especificado');
-                  }
-                } else {
-                  opmeItemSuppliers.push('Fornecedor não especificado');
-                }
-              }
-            } catch (err) {
-              console.error(`Erro ao buscar item OPME ${opmeItemId}:`, err);
-            }
-          }
-        }
+        // OPME items are no longer supported in current schema structure
+        // TODO: Implement OPME items with new schema structure
         
         // Buscar exames
         let examIds = [];
@@ -12924,19 +12876,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 6. Criar assinatura se não for plano gratuito
       if (planId !== 1 && subscription) {
         try {
+          // Extrair informações de desconto do session usando campos corretos do Stripe
+          const finalPrice = amount_total || 0;
+          const originalPrice = session.amount_subtotal || finalPrice; // Subtotal = preço original antes de desconto
+          const discountAmount = session.total_details?.amount_discount || 0;
+          
+          // Calcular percentual de desconto
+          let discountPercent = 0;
+          if (originalPrice > 0 && discountAmount > 0) {
+            discountPercent = Math.round((discountAmount / originalPrice) * 100);
+          }
+          
+          // Extrair código e descrição do cupom
+          let discountCode = null;
+          let discountDescription = null;
+          
+          if (session.discounts && session.discounts.length > 0) {
+            const firstDiscount = session.discounts[0];
+            discountCode = firstDiscount.coupon || null;
+            
+            if (discountPercent > 0) {
+              discountDescription = `${discountPercent}% de desconto`;
+            } else {
+              discountDescription = 'Desconto aplicado';
+            }
+          } else if (discountPercent === 0) {
+            discountDescription = '0% de desconto';
+          }
+          
+          console.log(`💰 [MATERIALIZAÇÃO] Dados de preço extraídos: Original: ${originalPrice}, Final: ${finalPrice}, Desconto: ${discountAmount} (${discountPercent}%)`);
+          console.log(`🎫 [MATERIALIZAÇÃO] Código de desconto: ${discountCode}, Descrição: ${discountDescription}`);
+
           const subscriptionData = {
             userId: user.id,
             planId: planId,
-            stripeSubscriptionId: subscription,
-            stripeCustomerId: customer,
             status: 'active',
-            currentPeriodStart: new Date(),
-            currentPeriodEnd: new Date(Date.now() + (plan.billingCycle === 'annual' ? 365 : 30) * 24 * 60 * 60 * 1000),
-            priceAtSubscription: amount_total ? amount_total / 100 : plan.fullPrice
+            paymentProviderSubscriptionId: subscription,
+            paymentProviderCustomerId: customer,
+            paymentProvider: 'stripe',
+            startedAt: new Date(),
+            expiresAt: new Date(Date.now() + (plan.billingCycle === 'annual' ? 365 : 30) * 24 * 60 * 60 * 1000),
+            finalPrice: finalPrice,
+            originalPrice: originalPrice,
+            discountAmount: discountAmount,
+            discountPercent: discountPercent,
+            discountCode: discountCode,
+            discountDescription: discountDescription
           };
           
           await storage.createUserSubscription(subscriptionData);
-          console.log(`✅ [MATERIALIZAÇÃO] Assinatura criada para usuário: ${user.id}`);
+          console.log(`✅ [MATERIALIZAÇÃO] Assinatura criada para usuário: ${user.id} com desconto aplicado`);
         } catch (subscriptionError) {
           console.error("⚠️ [MATERIALIZAÇÃO] Erro ao criar assinatura:", subscriptionError);
         }
@@ -12961,34 +12950,99 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   async function handleSubscriptionChanged(subscription: any): Promise<boolean> {
     try {
-      console.log(`🔄 Processando subscription ${subscription.status}: ${subscription.id}`);
+      console.log(`🔄 Processando subscription.updated: ${subscription.id} - Status: ${subscription.status}`);
       
-      const { customer, status, current_period_start, current_period_end, items } = subscription;
+      const { customer, status, current_period_start, current_period_end, items, canceled_at } = subscription;
       
-      // Obter o price_id do primeiro item da subscription
+      // 1. Buscar subscription na nossa base de dados
+      const userSubscription = await storage.getUserSubscriptionByProviderSubscriptionId(subscription.id);
+      if (!userSubscription) {
+        console.log(`⚠️ Subscription ${subscription.id} não encontrada na base - ignorando`);
+        return true;
+      }
+
+      console.log(`📍 Subscription encontrada: userId=${userSubscription.userId}, status atual=${userSubscription.status}`);
+
+      // 2. Mapear status do Stripe para nossos status
+      let mappedStatus = userSubscription.status; // Manter status atual por padrão
+      switch (status) {
+        case 'active':
+          mappedStatus = 'active';
+          break;
+        case 'canceled':
+        case 'cancelled':
+          mappedStatus = 'cancelled';
+          break;
+        case 'past_due':
+          mappedStatus = 'past_due';
+          break;
+        case 'unpaid':
+        case 'incomplete':
+        case 'incomplete_expired':
+          mappedStatus = 'expired';
+          break;
+        case 'trialing':
+          mappedStatus = 'trial';
+          break;
+        default:
+          console.log(`⚠️ Status '${status}' não mapeado - mantendo status atual`);
+      }
+
+      // 3. Preparar dados para atualização
+      const updateData: Partial<any> = {
+        status: mappedStatus,
+        updatedAt: new Date()
+      };
+
+      // 4. Atualizar data de expiração se ativa
+      if (status === 'active' && current_period_end) {
+        updateData.expiresAt = new Date(current_period_end * 1000);
+      }
+
+      // 5. Se foi cancelada, registrar data de cancelamento
+      if ((status === 'canceled' || status === 'cancelled') && canceled_at) {
+        updateData.cancelledAt = new Date(canceled_at * 1000);
+      }
+
+      // 6. Verificar mudança de plano (se price_id mudou)
       const priceId = items?.data?.[0]?.price?.id;
-      if (!priceId) {
-        console.log(`⚠️ Subscription sem price_id - ignorando`);
-        return true;
+      if (priceId) {
+        const [plan] = await db
+          .select()
+          .from(subscriptionPlans)
+          .where(or(
+            eq(subscriptionPlans.priceIdMonthly, priceId),
+            eq(subscriptionPlans.priceIdYearly, priceId)
+          ));
+
+        if (plan && plan.id !== userSubscription.planId) {
+          console.log(`📋 Mudança de plano detectada: ${userSubscription.planId} → ${plan.id}`);
+          updateData.planId = plan.id;
+          
+          // Atualizar preços se necessário
+          const isYearly = priceId === plan.priceIdYearly;
+          updateData.originalPrice = isYearly ? plan.priceYearly : plan.priceMonthly;
+          updateData.finalPrice = updateData.originalPrice; // Resetar para preço original
+        }
       }
 
-      // Buscar qual plano corresponde a este priceId
-      const [plan] = await db
-        .select()
-        .from(subscriptionPlans)
-        .where(or(
-          eq(subscriptionPlans.priceIdMonthly, priceId),
-          eq(subscriptionPlans.priceIdYearly, priceId)
-        ));
-
-      if (!plan) {
-        console.log(`⚠️ Plano não encontrado para priceId ${priceId}`);
-        return true;
+      // 7. Aplicar atualização
+      const updated = await storage.updateUserSubscription(userSubscription.id, updateData);
+      if (updated) {
+        console.log(`✅ Subscription ${subscription.id} sincronizada: ${userSubscription.status} → ${mappedStatus}`);
+        
+        // Log adicional para mudanças importantes
+        if (mappedStatus === 'cancelled') {
+          console.log(`🚫 Subscription cancelada para usuário ${userSubscription.userId}`);
+        } else if (mappedStatus === 'past_due') {
+          console.log(`⚠️ Subscription em atraso para usuário ${userSubscription.userId}`);
+        } else if (mappedStatus === 'active' && userSubscription.status !== 'active') {
+          console.log(`🎉 Subscription reativada para usuário ${userSubscription.userId}`);
+        }
+      } else {
+        console.error(`❌ Falha ao atualizar subscription ${subscription.id}`);
+        return false;
       }
-
-      // Buscar usuário pelo customerId (em um sistema real, você teria essa associação)
-      // Por enquanto, vamos apenas logar
-      console.log(`✅ Subscription ${subscription.id} atualizada: status=${status}, plano=${plan.name}`);
       
       return true;
     } catch (error: any) {
@@ -13001,10 +13055,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       console.log(`💰 Processando invoice.paid: ${invoice.id}`);
       
-      const { customer, subscription, amount_paid } = invoice;
+      const { customer, subscription: subscriptionId, amount_paid, paid, status } = invoice;
       
-      console.log(`✅ Pagamento processado: Customer ${customer}, Valor ${amount_paid / 100}`);
+      if (!subscriptionId) {
+        console.log(`⚠️ Invoice sem subscription associada - ignorando`);
+        return true;
+      }
+
+      // 1. Buscar subscription na nossa base de dados
+      const userSubscription = await storage.getUserSubscriptionByProviderSubscriptionId(subscriptionId);
+      if (!userSubscription) {
+        console.log(`⚠️ Subscription ${subscriptionId} não encontrada na base - ignorando`);
+        return true;
+      }
+
+      console.log(`📍 Pagamento encontrado para usuário ${userSubscription.userId}`);
+
+      // 2. Registrar o pagamento na tabela subscription_payments
+      try {
+        await storage.createSubscriptionPayment({
+          subscriptionId: userSubscription.id,
+          amount: amount_paid,
+          status: paid && status === 'paid' ? 'paid' : 'pending',
+          paymentProvider: 'stripe',
+          paymentProviderPaymentId: invoice.id,
+          paymentProviderCustomerId: customer,
+          paidAt: paid ? new Date() : undefined,
+          metadata: JSON.stringify({
+            invoiceId: invoice.id,
+            customerId: customer,
+            currency: invoice.currency,
+            billingReason: invoice.billing_reason
+          })
+        });
+        console.log(`📝 Pagamento registrado: R$ ${(amount_paid / 100).toFixed(2)}`);
+      } catch (paymentError) {
+        console.error(`⚠️ Erro ao registrar pagamento:`, paymentError);
+        // Continuar processamento mesmo com erro no registro
+      }
+
+      // 3. Atualizar status da subscription se necessário
+      if (paid && status === 'paid') {
+        // Se subscription estava em atraso, reativar
+        if (userSubscription.status === 'past_due') {
+          const updated = await storage.updateUserSubscription(userSubscription.id, {
+            status: 'active',
+            updatedAt: new Date()
+          });
+          
+          if (updated) {
+            console.log(`🎉 Subscription reativada após pagamento para usuário ${userSubscription.userId}`);
+          }
+        }
+      }
       
+      console.log(`✅ Invoice ${invoice.id} processado: R$ ${(amount_paid / 100).toFixed(2)} - Status: ${status}`);
       return true;
     } catch (error: any) {
       console.error(`❌ Erro ao processar invoice paid:`, error);
@@ -13016,13 +13121,111 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       console.log(`⚠️ Processando invoice.payment_failed: ${invoice.id}`);
       
-      const { customer, subscription, amount_due } = invoice;
+      const { customer, subscription: subscriptionId, amount_due, attempt_count } = invoice;
       
-      console.log(`❌ Falha no pagamento: Customer ${customer}, Valor ${amount_due / 100}`);
+      if (!subscriptionId) {
+        console.log(`⚠️ Invoice sem subscription associada - ignorando`);
+        return true;
+      }
+
+      // 1. Buscar subscription na nossa base de dados
+      const userSubscription = await storage.getUserSubscriptionByProviderSubscriptionId(subscriptionId);
+      if (!userSubscription) {
+        console.log(`⚠️ Subscription ${subscriptionId} não encontrada na base - ignorando`);
+        return true;
+      }
+
+      console.log(`📍 Falha de pagamento encontrada para usuário ${userSubscription.userId}`);
+
+      // 2. Registrar o pagamento falhado na tabela subscription_payments
+      try {
+        await storage.createSubscriptionPayment({
+          subscriptionId: userSubscription.id,
+          amount: amount_due,
+          status: 'failed',
+          paymentProvider: 'stripe',
+          paymentProviderPaymentId: invoice.id,
+          paymentProviderCustomerId: customer,
+          paidAt: undefined,
+          metadata: JSON.stringify({
+            invoiceId: invoice.id,
+            customerId: customer,
+            currency: invoice.currency,
+            attemptCount: attempt_count,
+            billingReason: invoice.billing_reason,
+            failureReason: 'payment_failed'
+          })
+        });
+        console.log(`📝 Falha de pagamento registrada: R$ ${(amount_due / 100).toFixed(2)} - Tentativa #${attempt_count}`);
+      } catch (paymentError) {
+        console.error(`⚠️ Erro ao registrar falha de pagamento:`, paymentError);
+        // Continuar processamento mesmo com erro no registro
+      }
+
+      // 3. Atualizar status da subscription para 'past_due' se estava ativa
+      if (userSubscription.status === 'active') {
+        const updated = await storage.updateUserSubscription(userSubscription.id, {
+          status: 'past_due',
+          updatedAt: new Date()
+        });
+        
+        if (updated) {
+          console.log(`⚠️ Subscription marcada como em atraso para usuário ${userSubscription.userId} (tentativa #${attempt_count})`);
+        }
+      } else {
+        console.log(`📋 Subscription já estava em status ${userSubscription.status} - mantendo status atual`);
+      }
       
+      console.log(`❌ Invoice ${invoice.id} processado: R$ ${(amount_due / 100).toFixed(2)} - Falha na tentativa #${attempt_count}`);
       return true;
     } catch (error: any) {
       console.error(`❌ Erro ao processar invoice payment failed:`, error);
+      return false;
+    }
+  }
+
+  async function handleSubscriptionDeleted(subscription: any): Promise<boolean> {
+    try {
+      console.log(`🗑️ Processando customer.subscription.deleted: ${subscription.id}`);
+      
+      const { customer, status, canceled_at } = subscription;
+      
+      // 1. Buscar subscription na nossa base de dados
+      const userSubscription = await storage.getUserSubscriptionByProviderSubscriptionId(subscription.id);
+      if (!userSubscription) {
+        console.log(`⚠️ Subscription ${subscription.id} não encontrada na base - ignorando`);
+        return true;
+      }
+
+      console.log(`📍 Cancelamento encontrado para usuário ${userSubscription.userId}`);
+
+      // 2. Atualizar status para 'cancelled' e registrar data de cancelamento
+      const cancelDate = canceled_at ? new Date(canceled_at * 1000) : new Date();
+      
+      const updateData: Partial<any> = {
+        status: 'cancelled',
+        cancelledAt: cancelDate,
+        updatedAt: new Date()
+      };
+
+      const updated = await storage.updateUserSubscription(userSubscription.id, updateData);
+      
+      if (updated) {
+        console.log(`🚫 Subscription cancelada para usuário ${userSubscription.userId} em ${cancelDate.toISOString()}`);
+        
+        // Log adicional se era uma subscription ativa
+        if (userSubscription.status === 'active') {
+          console.log(`⚠️ Subscription ativa foi cancelada - usuário perdeu acesso aos recursos premium`);
+        }
+      } else {
+        console.error(`❌ Falha ao cancelar subscription ${subscription.id}`);
+        return false;
+      }
+      
+      console.log(`✅ Subscription ${subscription.id} cancelada com sucesso`);
+      return true;
+    } catch (error: any) {
+      console.error(`❌ Erro ao processar subscription deleted:`, error);
       return false;
     }
   }
@@ -13114,35 +13317,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const subscriptionId = typeof session.subscription === 'object' && session.subscription ? session.subscription.id : session.subscription;
           const customerId = typeof session.customer === 'object' && session.customer ? session.customer.id : session.customer;
           
-          // Extrair informações de desconto do session
+          // Extrair informações de desconto do session usando campos corretos do Stripe
           const finalPrice = session.amount_total || 0;
-          let originalPrice = finalPrice; // Por padrão, original = final
-          let discountAmount = 0;
+          const originalPrice = session.amount_subtotal || finalPrice; // Subtotal = preço original antes de desconto
+          const discountAmount = session.total_details?.amount_discount || 0;
+          
+          // Calcular percentual de desconto
           let discountPercent = 0;
+          if (originalPrice > 0 && discountAmount > 0) {
+            discountPercent = Math.round((discountAmount / originalPrice) * 100);
+          }
+          
+          // Extrair código e descrição do cupom
           let discountCode = null;
           let discountDescription = null;
           
-          // Verificar se há descontos aplicados
-          if (session.total_details && session.total_details.breakdown) {
-            const breakdown = session.total_details.breakdown;
-            
-            // Calcular preço original baseado em descontos
-            if (breakdown.discounts && breakdown.discounts.length > 0) {
-              for (const discount of breakdown.discounts) {
-                discountAmount += discount.amount || 0;
-              }
-              originalPrice = finalPrice + discountAmount;
-              discountPercent = originalPrice > 0 ? Math.round((discountAmount / originalPrice) * 100) : 0;
-            }
-          }
-          
-          // Extrair código e descrição do primeiro desconto se disponível
           if (session.discounts && session.discounts.length > 0) {
             const firstDiscount = session.discounts[0];
-            if (firstDiscount.coupon) {
-              discountCode = firstDiscount.coupon.id || null;
-              discountDescription = firstDiscount.coupon.name || `${discountPercent}% de desconto`;
+            discountCode = firstDiscount.coupon || null;
+            
+            if (discountPercent > 0) {
+              discountDescription = `${discountPercent}% de desconto`;
+            } else {
+              discountDescription = 'Desconto aplicado';
             }
+          } else if (discountPercent === 0) {
+            discountDescription = '0% de desconto';
           }
           
           console.log(`💰 Dados de preço extraídos: Original: ${originalPrice}, Final: ${finalPrice}, Desconto: ${discountAmount} (${discountPercent}%)`);
@@ -13235,10 +13435,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           customer_email: session.customer_details?.email,
           amount_total: session.amount_total,
           subscription: {
-            id: subscription.stripeSubscriptionId,
+            id: subscription.paymentProviderSubscriptionId,
             status: subscription.status,
-            current_period_start: subscription.currentPeriodStart?.getTime() / 1000,
-            current_period_end: subscription.currentPeriodEnd?.getTime() / 1000
+            current_period_start: null,
+            current_period_end: null
           },
           metadata: {
             userId: userId,
@@ -13345,6 +13545,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
         case 'invoice.payment_failed':
           processed = await handleInvoicePaymentFailed(event.data.object as any);
+          break;
+          
+        case 'customer.subscription.deleted':
+          processed = await handleSubscriptionDeleted(event.data.object as any);
           break;
           
         default:
