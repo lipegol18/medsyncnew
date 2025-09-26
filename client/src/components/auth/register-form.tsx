@@ -17,6 +17,7 @@ interface RegisterFormProps {
   isLoading: boolean;
   validationErrors: Record<string, string>;
   onFieldValidation: (field: 'cpf' | 'crm' | 'phone' | 'email' | 'username', value: string, additionalData?: any) => void;
+  defaultValues?: Partial<RegisterForm>;
 }
 
 export function RegisterForm({
@@ -24,7 +25,8 @@ export function RegisterForm({
   onSwitchToLogin,
   isLoading,
   validationErrors,
-  onFieldValidation
+  onFieldValidation,
+  defaultValues
 }: RegisterFormProps) {
   const [isLoadingCEP, setIsLoadingCEP] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
@@ -32,10 +34,24 @@ export function RegisterForm({
   const registerForm = useForm<RegisterForm>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
-      firstName: '', lastName: '', email: '', phone: '', username: '',
-      password: '', confirmPassword: '', address: '', number: '', cep: '',
-      complement: '', neighborhood: '', city: '', state: '',
-      roleId: 2, medicalSpecialtyId: undefined, crm: '', crmUf: ''
+      firstName: defaultValues?.firstName || '', 
+      lastName: defaultValues?.lastName || '', 
+      email: defaultValues?.email || '', 
+      phone: defaultValues?.phone || '', 
+      username: defaultValues?.username || '',
+      password: '', confirmPassword: '', 
+      address: defaultValues?.address || '', 
+      number: defaultValues?.number || '', 
+      cep: defaultValues?.cep || '',
+      complement: defaultValues?.complement || '', 
+      neighborhood: defaultValues?.neighborhood || '', 
+      city: defaultValues?.city || '', 
+      state: defaultValues?.state || '',
+      roleId: defaultValues?.roleId || 2, 
+      medicalSpecialtyId: defaultValues?.medicalSpecialtyId || undefined, 
+      crm: defaultValues?.crm || '', 
+      crmUf: defaultValues?.crmUf || '',
+      cpf: defaultValues?.cpf || ''
     }
   });
 
@@ -56,6 +72,13 @@ export function RegisterForm({
           registerForm.setValue('city', addressData.localidade);
           registerForm.setValue('state', addressData.uf);
           registerForm.setValue('complement', addressData.complemento || '');
+          
+          // Revalidar campos preenchidos para limpar erros
+          registerForm.trigger('address');
+          registerForm.trigger('neighborhood');
+          registerForm.trigger('city');
+          registerForm.trigger('state');
+          registerForm.trigger('complement');
           
           // Focar no campo número após preenchimento
           const numberField = document.getElementById('reg-number');
@@ -205,7 +228,10 @@ export function RegisterForm({
             <Label htmlFor="reg-crm-uf" className="text-sm text-gray-700 font-bold">UF do CRM</Label>
             <Select
               value={registerForm.watch('crmUf') || ""}
-              onValueChange={(value) => registerForm.setValue('crmUf', value)}
+              onValueChange={(value) => {
+                registerForm.setValue('crmUf', value);
+                registerForm.trigger('crmUf'); // Força revalidação para limpar erro
+              }}
             >
               <SelectTrigger className="h-9 rounded-lg border-2 border-gray-200 focus:border-accent">
                 <SelectValue placeholder="UF" />
@@ -258,6 +284,7 @@ export function RegisterForm({
             onChange={(e) => {
               const maskedValue = applyCEPMask(e.target.value);
               registerForm.setValue('cep', maskedValue);
+              registerForm.trigger('cep'); // Força revalidação para limpar erro
             }}
             onBlur={(e) => {
               // Usar setTimeout para não interferir na navegação TAB
@@ -351,6 +378,7 @@ export function RegisterForm({
               onChange={(e) => {
                 const value = e.target.value.toUpperCase();
                 registerForm.setValue('state', value);
+                registerForm.trigger('state'); // Força revalidação para limpar erro
               }}
             />
             {registerForm.formState.errors.state && (
@@ -391,6 +419,7 @@ export function RegisterForm({
               onChange={(e) => {
                 const maskedValue = applyPhoneMask(e.target.value);
                 registerForm.setValue('phone', maskedValue);
+                registerForm.trigger('phone'); // Força revalidação para limpar erro
               }}
               onBlur={(e) => {
                 setTimeout(() => {
@@ -463,7 +492,10 @@ export function RegisterForm({
           <Label htmlFor="reg-medicalSpecialtyId" className="text-sm text-gray-700 font-bold">Especialidade Médica</Label>
           <Select
             value={registerForm.watch('medicalSpecialtyId')?.toString() || ""} 
-            onValueChange={(value) => registerForm.setValue('medicalSpecialtyId', parseInt(value))}
+            onValueChange={(value) => {
+              registerForm.setValue('medicalSpecialtyId', parseInt(value));
+              registerForm.trigger('medicalSpecialtyId'); // Força revalidação para limpar erro
+            }}
           >
             <SelectTrigger className="h-9 rounded-lg border-2 border-gray-200 focus:border-accent">
               <SelectValue placeholder="Selecione sua especialidade" />
