@@ -804,7 +804,7 @@ export default function AuthPage() {
             )}
           </DialogHeader>
 
-          <div className="p-4 sm:p-6 lg:p-12 bg-white">
+          <div className="p-4 sm:p-6 lg:px-12 lg:pb-12 lg:pt-4 bg-white">
             {modalType === "login" ? (
               <LoginModal
                 onSubmit={handleLoginSubmit}
