@@ -202,55 +202,90 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Nova API de fornecedores por cirurgias - movida para evitar conflitos com middleware global
+  // Nova API de fornecedores por cirurgias - sem middleware específico 
   app.get("/api/supplier-distribution-data", async (req: Request, res: Response) => {
     try {
-      // Usar fallback direto para usuário padrão (mesmo padrão da hospital-distribution)
-      const userId = req.user?.id || 83;
-      const isAdmin = req.user?.roleId === 1 || false;
+      // Verificar autenticação manualmente
+      if (!req.isAuthenticated() || !req.user?.id) {
+        console.log("🔍 supplier-distribution-data - Usuário não autenticado:", {
+          isAuthenticated: req.isAuthenticated ? req.isAuthenticated() : false,
+          hasUser: !!req.user,
+          sessionID: req.sessionID,
+          userId: req.user?.id
+        });
+        return res.status(401).json({ error: "Usuário não autenticado" });
+      }
+      
+      const userId = req.user.id;
+      const isAdmin = req.user.roleId === 1;
+      
+      console.log(`🔍 supplier-distribution-data - Usuário autenticado: ${userId}`);
+      
+      // Extrair filtros da query string
+      const startDate = req.query.startDate as string;
+      const endDate = req.query.endDate as string;
+      const statusFilter = req.query.status as string;
+      const hospitalIdFilter = req.query.hospitalId as string;
       
       console.log(`=== SUPPLIER-DISTRIBUTION-DATA - FORNECEDORES SELECIONADOS POR CIRURGIAS ===`);
       console.log(`Usuário ID: ${userId}, É Admin: ${isAdmin}`);
+      console.log(`Filtros aplicados:`, { startDate, endDate, statusFilter, hospitalIdFilter });
       
       let query: string;
       let params: any[] = [];
+      let whereConditions: string[] = [];
+      
+      // Condições base
+      whereConditions.push("mo.status_id != 1");
+      // Removendo filtro de aprovação para mostrar todos os fornecedores selecionados
+      // whereConditions.push("mos.is_approved = true");
       
       if (isAdmin) {
-        // Admin vê todos os fornecedores SELECIONADOS (exceto pedidos incompletos)
-        query = `
-          SELECT 
-            COALESCE(s.company_name, s.trade_name, 'Fornecedor não especificado') as supplierName,
-            COUNT(DISTINCT mo.id) as surgeryCount
-          FROM 
-            medical_orders mo
-          INNER JOIN 
-            medical_order_suppliers mos ON mo.id = mos.order_id
-          INNER JOIN
-            suppliers s ON mos.supplier_id = s.id
-          WHERE mo.status_id != 1 AND mos.is_approved = true
-          GROUP BY s.company_name, s.trade_name
-          ORDER BY COUNT(DISTINCT mo.id) DESC
-          LIMIT 15
-        `;
+        // Admin pode ver todos os fornecedores, mas ainda aplicamos filtros específicos
+        console.log("Usuário é admin - vendo todos os fornecedores");
       } else {
-        // Médicos veem apenas seus próprios fornecedores SELECIONADOS (exceto pedidos incompletos)
-        query = `
-          SELECT 
-            COALESCE(s.company_name, s.trade_name, 'Fornecedor não especificado') as supplierName,
-            COUNT(DISTINCT mo.id) as surgeryCount
-          FROM 
-            medical_orders mo
-          INNER JOIN 
-            medical_order_suppliers mos ON mo.id = mos.order_id
-          INNER JOIN
-            suppliers s ON mos.supplier_id = s.id
-          WHERE mo.user_id = $1 AND mo.status_id != 1 AND mos.is_approved = true
-          GROUP BY s.company_name, s.trade_name
-          ORDER BY COUNT(DISTINCT mo.id) DESC
-          LIMIT 15
-        `;
-        params = [userId];
+        // Médico vê apenas seus próprios fornecedores
+        whereConditions.push(`mo.user_id = $${params.length + 1}`);
+        params.push(userId);
       }
+      
+      // Aplicar filtro de data de início
+      if (startDate) {
+        whereConditions.push(`mo.created_at >= $${params.length + 1}`);
+        params.push(startDate);
+        console.log(`Filtro data início aplicado: ${startDate}`);
+      }
+      
+      // Aplicar filtro de data de fim
+      if (endDate) {
+        whereConditions.push(`mo.created_at <= $${params.length + 1}`);
+        params.push(endDate + ' 23:59:59'); // Incluir o dia inteiro
+        console.log(`Filtro data fim aplicado: ${endDate}`);
+      }
+      
+      // Aplicar filtro de hospital específico
+      if (hospitalIdFilter && hospitalIdFilter !== 'all') {
+        whereConditions.push(`mo.hospital_id = $${params.length + 1}`);
+        params.push(parseInt(hospitalIdFilter));
+        console.log(`Filtro hospital aplicado: ${hospitalIdFilter}`);
+      }
+      
+      // Construir a query com as condições WHERE
+      query = `
+        SELECT 
+          COALESCE(s.company_name, s.trade_name, 'Fornecedor não especificado') as supplierName,
+          COUNT(DISTINCT mo.id) as surgeryCount
+        FROM 
+          medical_orders mo
+        INNER JOIN 
+          medical_order_suppliers mos ON mo.id = mos.order_id
+        INNER JOIN
+          suppliers s ON mos.supplier_id = s.id
+        WHERE ${whereConditions.join(' AND ')}
+        GROUP BY s.company_name, s.trade_name
+        ORDER BY COUNT(DISTINCT mo.id) DESC
+        LIMIT 15
+      `;
       
       console.log(`Query fornecedores por cirurgias: ${query}`);
       console.log(`Parâmetros: ${JSON.stringify(params)}`);
@@ -12747,6 +12782,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Erro ao remover justificativa:", error);
       res.status(500).json({ message: "Erro interno do servidor" });
+    }
+  });
+
+  // =================== CONFIG ENDPOINTS ===================
+  
+  // GET /api/config/support - Retorna números de WhatsApp para suporte
+  app.get('/api/config/support', (req: any, res: any) => {
+    try {
+      // Importar configurações do arquivo centralizado
+      const { WHATSAPP_CONFIG } = require("../shared/config");
+      
+      const supportConfig = {
+        default: WHATSAPP_CONFIG.default,
+        contexts: WHATSAPP_CONFIG.contexts
+      };
+      
+      res.json(supportConfig);
+    } catch (error) {
+      console.error('Erro ao buscar configuração de suporte:', error);
+      res.status(500).json({ 
+        error: "Erro interno do servidor",
+        // Fallback em caso de erro
+        default: "5521997364870",
+        contexts: {
+          br: "5521997364870",
+          pt: "5521997364870", 
+          sales: "5521997364870"
+        }
+      });
     }
   });
 
