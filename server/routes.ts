@@ -205,19 +205,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Nova API de fornecedores por cirurgias - sem middleware específico 
   app.get("/api/supplier-distribution-data", async (req: Request, res: Response) => {
     try {
-      // Verificar autenticação manualmente
-      if (!req.isAuthenticated() || !req.user?.id) {
-        console.log("🔍 supplier-distribution-data - Usuário não autenticado:", {
-          isAuthenticated: req.isAuthenticated ? req.isAuthenticated() : false,
-          hasUser: !!req.user,
-          sessionID: req.sessionID,
-          userId: req.user?.id
-        });
-        return res.status(401).json({ error: "Usuário não autenticado" });
-      }
+      // Debug detalhado da autenticação
+      console.log("🔍 supplier-distribution-data - DEBUG COMPLETO:", {
+        hasUser: !!req.user,
+        userId: req.user?.id,
+        userRole: req.user?.roleId,
+        sessionID: req.sessionID,
+        isAuthenticated: req.isAuthenticated ? req.isAuthenticated() : 'função não existe',
+        cookies: req.cookies,
+        session: req.session
+      });
       
-      const userId = req.user.id;
-      const isAdmin = req.user.roleId === 1;
+      const userId = req.user?.id;
+      const isAdmin = req.user?.roleId === 1;
+      
+      if (!userId) {
+        console.log("🔍 supplier-distribution-data - Usuário não autenticado - retornando array vazio");
+        return res.json([]);
+      }
       
       console.log(`🔍 supplier-distribution-data - Usuário autenticado: ${userId}`);
       
@@ -235,10 +240,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let params: any[] = [];
       let whereConditions: string[] = [];
       
-      // Condições base
-      whereConditions.push("mo.status_id != 1");
-      // Removendo filtro de aprovação para mostrar todos os fornecedores selecionados
-      // whereConditions.push("mos.is_approved = true");
+      // Condições base: excluir pedidos incompletos e cancelados
+      whereConditions.push("mo.status_id NOT IN (1, 5, 7)");
       
       if (isAdmin) {
         // Admin pode ver todos os fornecedores, mas ainda aplicamos filtros específicos
@@ -1551,7 +1554,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`Buscando distribuição de cirurgias por convênio - usuário ${userId}, isAdmin: ${isAdmin}, filtros: ${startDate} a ${endDate}`);
         
         // Construir condições WHERE dinamicamente
-        let whereConditions = [];
+        let whereConditions = ['mo.status_id NOT IN (5, 7)'];  // Excluir canceladas e rejeitadas
         let params = [];
         let paramIndex = 1;
         
@@ -1567,7 +1570,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           paramIndex++;
         }
         
-        const whereClause = whereConditions.length > 0 ? whereConditions.join(' AND ') : '1=1';
+        const whereClause = whereConditions.join(' AND ');
         
         // Consulta SQL para extrair dados reais do banco
         const query = `
@@ -1664,7 +1667,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`Buscando principais procedimentos cirúrgicos - usuário ${userId}, isAdmin: ${isAdmin}, limit: ${limit}, filtros: ${startDate} a ${endDate}`);
         
         // Construir condições WHERE dinamicamente
-        let whereConditions = [];
+        let whereConditions = ['mo.status_id NOT IN (5, 7)'];  // Excluir canceladas e rejeitadas
         let params = [];
         let paramIndex = 1;
         
@@ -1683,7 +1686,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         params.push(limit);
         const limitParam = paramIndex;
         
-        const whereClause = whereConditions.length > 0 ? whereConditions.join(' AND ') : '1=1';
+        const whereClause = whereConditions.join(' AND ');
         
         // Consulta SQL para obter os procedimentos cirúrgicos mais frequentes
         const query = `
@@ -1851,7 +1854,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`Buscando estatísticas de cirurgias eletivas vs urgência - usuário ${userId}, isAdmin: ${isAdmin}, filtros: ${startDate} a ${endDate}`);
         
         // Construir condições WHERE dinamicamente
-        let whereConditions = ['status_id != 1'];
+        let whereConditions = ['status_id NOT IN (5, 7)'];  // Excluir canceladas e rejeitadas
         let params = [];
         let paramIndex = 1;
         
@@ -1867,7 +1870,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           paramIndex++;
         }
         
-        const whereClause = whereConditions.join(' AND ');
+        const whereClause = `WHERE ${whereConditions.join(' AND ')}`;
         
         // Consulta SQL para extrair dados reais do banco - usando 'procedure_type' que existe na tabela
         const query = `
@@ -1879,7 +1882,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             END as surgery_type,
             COUNT(*) as count
           FROM medical_orders
-          WHERE ${whereClause}
+          ${whereClause}
           GROUP BY surgery_type
         )
         SELECT surgery_type as name, count as value 
@@ -1961,7 +1964,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const currentYear = new Date().getFullYear();
             
             // Construir condições WHERE dinamicamente
-            let whereConditions = [];
+            let whereConditions = ['status_id NOT IN (5, 7)'];  // Excluir canceladas e rejeitadas
             let params = [];
             let paramIndex = 1;
             
@@ -2066,7 +2069,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
             
             // Construir condições WHERE dinamicamente
-            let whereConditions = [];
+            let whereConditions = ['status_id NOT IN (5, 7)'];  // Excluir canceladas e rejeitadas
             let params = [dateFormat];
             let paramIndex = 2;
             
@@ -2082,7 +2085,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               paramIndex++;
             }
             
-            const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+            const whereClause = `WHERE ${whereConditions.join(' AND ')}`;
             
             const query = `
             WITH date_periods AS (
@@ -3605,8 +3608,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let params: any[] = [];
       let whereConditions: string[] = [];
       
-      // Condição base: excluir pedidos incompletos
-      whereConditions.push("mo.status_id != 1");
+      // Condição base: excluir pedidos incompletos e cancelados
+      whereConditions.push("mo.status_id NOT IN (1, 5, 7)");
       
       if (isAdmin) {
         // Admin pode ver todas as cirurgias, mas ainda aplicamos filtros específicos
@@ -3670,6 +3673,266 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
     } catch (error) {
       console.error("Erro na API hospital-distribution-working:", error);
+      return res.status(500).json({ error: "Erro interno do servidor" });
+    }
+  });
+
+  // API para estatísticas detalhadas de cirurgias por hospital
+  app.get("/api/hospital-distribution-stats", async (req: Request, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      const isAdmin = req.user?.roleId === 1;
+      
+      if (!userId) {
+        return res.json({ completedCount: 0, incompleteCount: 0, cancelledCount: 0, totalCount: 0 });
+      }
+      
+      // Extrair filtros da query string
+      const startDate = req.query.startDate as string;
+      const endDate = req.query.endDate as string;
+      const hospitalIdFilter = req.query.hospitalId as string;
+      
+      let whereConditions: string[] = [];
+      let params: any[] = [];
+      
+      if (isAdmin) {
+        // Admin pode ver todas as cirurgias
+      } else {
+        // Médico vê apenas suas próprias cirurgias
+        whereConditions.push(`mo.user_id = $${params.length + 1}`);
+        params.push(userId);
+      }
+      
+      // Aplicar filtro de data de início
+      if (startDate) {
+        whereConditions.push(`mo.created_at >= $${params.length + 1}`);
+        params.push(startDate);
+      }
+      
+      // Aplicar filtro de data de fim
+      if (endDate) {
+        whereConditions.push(`mo.created_at <= $${params.length + 1}`);
+        params.push(endDate + ' 23:59:59');
+      }
+      
+      // Aplicar filtro de hospital específico
+      if (hospitalIdFilter && hospitalIdFilter !== 'all') {
+        whereConditions.push(`mo.hospital_id = $${params.length + 1}`);
+        params.push(parseInt(hospitalIdFilter));
+      }
+      
+      const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+      
+      const query = `
+        SELECT 
+          COUNT(*) FILTER (WHERE mo.status_id NOT IN (1, 5, 7)) as completed_count,
+          COUNT(*) FILTER (WHERE mo.status_id = 1) as incomplete_count,
+          COUNT(*) FILTER (WHERE mo.status_id IN (5, 7)) as cancelled_count,
+          COUNT(*) as total_count
+        FROM medical_orders mo
+        ${whereClause}
+      `;
+      
+      const result = await pool.query(query, params);
+      const stats = {
+        completedCount: parseInt(result.rows[0].completed_count || '0'),
+        incompleteCount: parseInt(result.rows[0].incomplete_count || '0'),
+        cancelledCount: parseInt(result.rows[0].cancelled_count || '0'),
+        totalCount: parseInt(result.rows[0].total_count || '0')
+      };
+      
+      console.log(`Estatísticas de cirurgias por hospital para usuário ${userId}:`, stats);
+      
+      return res.json(stats);
+      
+    } catch (error) {
+      console.error("Erro na API hospital-distribution-stats:", error);
+      return res.status(500).json({ error: "Erro interno do servidor" });
+    }
+  });
+
+  // Endpoint para estatísticas de fornecedores (resumo detalhado)
+  app.get("/api/supplier-distribution-stats", async (req: Request, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      const isAdmin = req.user?.roleId === 1;
+      
+      if (!userId) {
+        return res.json({ completedCount: 0, incompleteCount: 0, cancelledCount: 0, totalCount: 0, suppliersCount: 0 });
+      }
+      
+      // Extrair filtros da query string
+      const startDate = req.query.startDate as string;
+      const endDate = req.query.endDate as string;
+      const hospitalIdFilter = req.query.hospitalId as string;
+      
+      let whereConditions: string[] = [];
+      let params: any[] = [];
+      
+      if (isAdmin) {
+        // Admin pode ver todas as cirurgias
+      } else {
+        // Médico vê apenas suas próprias cirurgias
+        whereConditions.push(`mo.user_id = $${params.length + 1}`);
+        params.push(userId);
+      }
+      
+      // Aplicar filtro de data de início
+      if (startDate) {
+        whereConditions.push(`mo.created_at >= $${params.length + 1}`);
+        params.push(startDate);
+      }
+      
+      // Aplicar filtro de data de fim
+      if (endDate) {
+        whereConditions.push(`mo.created_at <= $${params.length + 1}`);
+        params.push(endDate + ' 23:59:59');
+      }
+      
+      // Aplicar filtro de hospital específico
+      if (hospitalIdFilter && hospitalIdFilter !== 'all') {
+        whereConditions.push(`mo.hospital_id = $${params.length + 1}`);
+        params.push(parseInt(hospitalIdFilter));
+      }
+      
+      const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+      
+      // Query para estatísticas gerais
+      const statsQuery = `
+        SELECT 
+          COUNT(*) FILTER (WHERE mo.status_id NOT IN (1, 5, 7)) as completed_count,
+          COUNT(*) FILTER (WHERE mo.status_id = 1) as incomplete_count,
+          COUNT(*) FILTER (WHERE mo.status_id IN (5, 7)) as cancelled_count,
+          COUNT(*) as total_count
+        FROM medical_orders mo
+        ${whereClause}
+      `;
+      
+      // Query para contar fornecedores únicos (apenas em pedidos válidos)
+      const supplierWhereConditions = [...whereConditions];
+      supplierWhereConditions.push('mo.status_id NOT IN (1, 5, 7)');
+      const supplierWhereClause = supplierWhereConditions.length > 0 ? `WHERE ${supplierWhereConditions.join(' AND ')}` : '';
+      
+      const suppliersQuery = `
+        SELECT COUNT(DISTINCT mos.supplier_id) as suppliers_count
+        FROM medical_orders mo
+        INNER JOIN medical_order_suppliers mos ON mo.id = mos.order_id
+        ${supplierWhereClause}
+      `;
+      
+      const statsResult = await pool.query(statsQuery, params);
+      const suppliersResult = await pool.query(suppliersQuery, params);
+      
+      const stats = {
+        completedCount: parseInt(statsResult.rows[0].completed_count || '0'),
+        incompleteCount: parseInt(statsResult.rows[0].incomplete_count || '0'),
+        cancelledCount: parseInt(statsResult.rows[0].cancelled_count || '0'),
+        totalCount: parseInt(statsResult.rows[0].total_count || '0'),
+        suppliersCount: parseInt(suppliersResult.rows[0].suppliers_count || '0')
+      };
+      
+      console.log(`Estatísticas de fornecedores para usuário ${userId}:`, stats);
+      
+      return res.json(stats);
+      
+    } catch (error) {
+      console.error("Erro na API supplier-distribution-stats:", error);
+      return res.status(500).json({ error: "Erro interno do servidor" });
+    }
+  });
+
+  // Endpoint para dados de fornecedores por cirurgias
+  app.get("/api/supplier-distribution-working", async (req: Request, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      const isAdmin = req.user?.roleId === 1;
+      
+      // Extrair filtros da query string
+      const startDate = req.query.startDate as string;
+      const endDate = req.query.endDate as string;
+      const statusFilter = req.query.status as string;
+      const hospitalIdFilter = req.query.hospitalId as string;
+      
+      console.log(`=== SUPPLIER-DISTRIBUTION-WORKING - FORNECEDORES POR CIRURGIAS ===`);
+      console.log(`Usuário ID: ${userId}, É Admin: ${isAdmin}`);
+      console.log(`Filtros aplicados:`, { startDate, endDate, statusFilter, hospitalIdFilter });
+      
+      // Se não há usuário autenticado, retornar array vazio
+      if (!userId) {
+        console.log("Usuário não autenticado - retornando array vazio");
+        return res.json([]);
+      }
+      
+      let params: any[] = [];
+      let whereConditions: string[] = [];
+      
+      // Condição base: excluir pedidos incompletos e cancelados
+      whereConditions.push("mo.status_id NOT IN (1, 5, 7)");
+      
+      if (isAdmin) {
+        // Admin pode ver todas as cirurgias
+        console.log("Usuário é admin - vendo todas as cirurgias");
+      } else {
+        // Médico vê apenas suas próprias cirurgias
+        whereConditions.push(`mo.user_id = $${params.length + 1}`);
+        params.push(userId);
+      }
+      
+      // Aplicar filtro de data de início
+      if (startDate) {
+        whereConditions.push(`mo.created_at >= $${params.length + 1}`);
+        params.push(startDate);
+        console.log(`Filtro data início aplicado: ${startDate}`);
+      }
+      
+      // Aplicar filtro de data de fim
+      if (endDate) {
+        whereConditions.push(`mo.created_at <= $${params.length + 1}`);
+        params.push(endDate + ' 23:59:59');
+        console.log(`Filtro data fim aplicado: ${endDate}`);
+      }
+      
+      // Aplicar filtro de hospital específico
+      if (hospitalIdFilter && hospitalIdFilter !== 'all') {
+        whereConditions.push(`mo.hospital_id = $${params.length + 1}`);
+        params.push(parseInt(hospitalIdFilter));
+        console.log(`Filtro hospital aplicado: ${hospitalIdFilter}`);
+      }
+      
+      // Query para buscar fornecedores e quantidade de cirurgias
+      const query = `
+        SELECT 
+          TRIM(COALESCE(s.trade_name, s.company_name, 'Fornecedor não especificado')) as supplierName,
+          COUNT(DISTINCT mo.id) as surgeryCount
+        FROM 
+          medical_orders mo
+        INNER JOIN 
+          medical_order_suppliers mos ON mo.id = mos.order_id
+        LEFT JOIN 
+          suppliers s ON mos.supplier_id = s.id
+        WHERE ${whereConditions.join(' AND ')}
+        GROUP BY s.id, s.trade_name, s.company_name
+        ORDER BY COUNT(DISTINCT mo.id) DESC
+        LIMIT 10
+      `;
+      
+      console.log(`Query fornecedores por cirurgias: ${query}`);
+      console.log(`Parâmetros: ${JSON.stringify(params)}`);
+      
+      const result = await pool.query(query, params);
+      console.log(`Resultado bruto da query:`, result.rows);
+      
+      const formattedResult = result.rows.map(row => ({
+        supplierName: String(row.suppliername).trim(),
+        surgeryCount: parseInt(row.surgerycount)
+      }));
+      
+      console.log(`DADOS REAIS DE FORNECEDORES POR CIRURGIAS PARA USUÁRIO ${userId}:`, formattedResult);
+      
+      return res.json(formattedResult);
+      
+    } catch (error) {
+      console.error("Erro na API supplier-distribution-working:", error);
       return res.status(500).json({ error: "Erro interno do servidor" });
     }
   });

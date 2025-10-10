@@ -3086,7 +3086,8 @@ export class DatabaseStorage implements IStorage {
   async countAllMedicalOrders(): Promise<number> {
     try {
       const result = await db.select({ count: sql`count(*)` })
-        .from(medicalOrders);
+        .from(medicalOrders)
+        .where(notInArray(medicalOrders.statusId, [5, 7]));  // Excluir canceladas e rejeitadas
       return Number(result[0].count) || 0;
     } catch (error) {
       console.error("Erro ao contar todos os pedidos médicos:", error);
@@ -3099,7 +3100,10 @@ export class DatabaseStorage implements IStorage {
     try {
       const result = await db.select({ count: sql`count(*)` })
         .from(medicalOrders)
-        .where(eq(medicalOrders.doctorId, doctorId));
+        .where(and(
+          eq(medicalOrders.userId, doctorId),
+          notInArray(medicalOrders.statusId, [5, 7])  // Excluir canceladas e rejeitadas
+        ));
       return Number(result[0].count) || 0;
     } catch (error) {
       console.error(`Erro ao contar pedidos do médico ${doctorId}:`, error);
@@ -3415,8 +3419,17 @@ export class DatabaseStorage implements IStorage {
         ORDER BY count(m.id) DESC
       `);
       
+      // Acessar o resultado corretamente (Drizzle pode retornar um objeto com rows)
+      const rows = result.rows || result;
+      
+      // Verificar se é array antes de mapear
+      if (!Array.isArray(rows)) {
+        console.error("Resultado não é um array:", rows);
+        throw new Error("Resultado da query não é um array");
+      }
+      
       // Mapear e formatar os resultados
-      return result.map(row => ({
+      return rows.map(row => ({
         hospitalName: row.hospitalName as string,
         orderCount: Number(row.orderCount) || 0
       }));
