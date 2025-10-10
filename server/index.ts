@@ -15,7 +15,7 @@ app.use(cookieParser());
 // Configure CORS para permitir chamadas de aplicações mobile e domínio público
 app.use(cors({
   origin: [
-    "http://localhost:5000", 
+    "http://localhost:5001", 
     "http://localhost:3000",
     "https://medsync.replit.app",
     "https://*.replit.app"
@@ -309,10 +309,10 @@ app.use((req, res, next) => {
     res.send(html);
   });
 
-  // ALWAYS serve the app on port 5000
+  // ALWAYS serve the app on port 5001
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
-  const port = 5000;
+  const port = 5001;
   server.listen({
     port,
     host: "0.0.0.0",
