@@ -342,8 +342,8 @@ export function PricingSection({ onPlanSelection, selectedPlanId, onAdvanceToPay
               hoveredPlan === 'CLINICA' ? 'shadow-xl scale-105' : ''
             } ${selectedPlanCard === 'CLINICA' ? 'ring-2 ring-sky-400 ring-offset-2' : ''}`}
           >
-            <div className="bg-medsync-blue px-3 lg:px-4 py-2 lg:py-3">
-              <h3 className="text-xs lg:text-sm font-black text-white text-center" style={{fontFamily: 'Nunito, sans-serif'}}>Plano CLÍNICA</h3>
+            <div className="bg-medsync-blue px-3 lg:px-4 py-3 lg:py-4">
+              <h3 className="text-sm lg:text-base font-black text-white text-center" style={{fontFamily: 'Nunito, sans-serif'}}>Plano CLÍNICA</h3>
             </div>
             <div className="text-center px-3 pb-1 pt-2 lg:px-2 lg:pb-2 lg:pt-2">
               {(() => {
@@ -505,13 +505,13 @@ export function PricingSection({ onPlanSelection, selectedPlanId, onAdvanceToPay
             onClick={() => handlePlanSelection('START')}
             onMouseEnter={() => setHoveredPlan('START')}
             onMouseLeave={() => setHoveredPlan(null)}
-            className={`bg-gradient-to-br from-white to-gray-50 rounded-2xl shadow-lg border border-gray-200 flex flex-col overflow-hidden transition-all duration-300 relative z-10 ${
-              hoveredPlan === 'START' ? 'shadow-2xl scale-105 border-sky-300' : ''
-            } ${selectedPlanCard === 'START' ? 'ring-2 ring-sky-400 ring-offset-2 shadow-2xl' : ''}`}
+            className={`bg-gradient-to-br from-white to-gray-50 rounded-2xl shadow-lg flex flex-col overflow-hidden transition-all duration-300 relative z-10 ${
+              hoveredPlan === 'START' ? 'shadow-xl scale-105' : ''
+            } ${selectedPlanCard === 'START' ? 'ring-2 ring-sky-400 ring-offset-2' : ''}`}
           >
             <div className="bg-gradient-to-r from-sky-100 to-blue-100 px-3 lg:px-4 py-3 lg:py-4">
               <h3 className="text-sm lg:text-base font-black text-accent text-center flex items-center justify-center gap-2" style={{fontFamily: 'Nunito, sans-serif'}}>
-                🚀 Plano START
+                Plano START
               </h3>
             </div>
             <div className="p-3 lg:p-4">
@@ -527,22 +527,19 @@ export function PricingSection({ onPlanSelection, selectedPlanId, onAdvanceToPay
           <div className="relative">
             {/* Badge de mais popular */}
             <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 z-30">
-              <span className="bg-gradient-to-r from-orange-400 to-orange-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg">
-                ⭐ MAIS POPULAR
-              </span>
             </div>
             
             <button 
               onClick={() => handlePlanSelection('PRO')}
               onMouseEnter={() => setHoveredPlan('PRO')}
               onMouseLeave={() => setHoveredPlan(null)}
-              className={`bg-gradient-to-br from-white to-blue-50 rounded-2xl shadow-xl border-2 border-blue-200 flex flex-col overflow-hidden transition-all duration-300 relative z-10 ${
-                hoveredPlan === 'PRO' ? 'shadow-2xl scale-105 border-blue-400' : ''
-              } ${selectedPlanCard === 'PRO' ? 'ring-2 ring-blue-500 ring-offset-2 shadow-2xl' : ''}`}
+              className={`bg-gradient-to-br from-white to-blue-50 rounded-2xl shadow-lg flex flex-col overflow-hidden transition-all duration-300 relative z-10 ${
+                hoveredPlan === 'PRO' ? 'shadow-xl scale-105' : ''
+              } ${selectedPlanCard === 'PRO' ? 'ring-2 ring-sky-400 ring-offset-2' : ''}`}
             >
-              <div className="bg-gradient-to-r from-sky-400 to-blue-500 px-3 lg:px-4 py-3 lg:py-4">
+              <div className="bg-sky-400 px-3 lg:px-4 py-3 lg:py-4">
                 <h3 className="text-sm lg:text-base font-black text-white text-center flex items-center justify-center gap-2" style={{fontFamily: 'Nunito, sans-serif'}}>
-                  💼 Plano PRO
+                  Plano PRO
                 </h3>
               </div>
             <div className="text-center px-2 pb-1 pt-2 lg:px-2 lg:pb-2 lg:pt-2">
@@ -560,13 +557,6 @@ export function PricingSection({ onPlanSelection, selectedPlanId, onAdvanceToPay
                   
                   return (
                     <div className="mb-2 lg:mb-3 relative">
-                      {billingInterval === 'yearly' && (
-                        <div className="absolute top-0 right-0 z-20">
-                          <span className="inline-block px-2 py-1 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-700 transform rotate-12 shadow-sm" style={{fontFamily: 'Nunito, sans-serif'}}>
-                            2 meses grátis
-                          </span>
-                        </div>
-                      )}
                       <span className="text-xs text-gray-600 font-bold" style={{fontFamily: 'Nunito, sans-serif'}}>
                         {billingInterval === 'yearly' ? 'Valor anual' : 'Valor mensal'}
                       </span><br/>
@@ -670,8 +660,8 @@ export function PricingSection({ onPlanSelection, selectedPlanId, onAdvanceToPay
               hoveredPlan === 'CLINICA' ? 'shadow-xl scale-105' : ''
             } ${selectedPlanCard === 'CLINICA' ? 'ring-2 ring-sky-400 ring-offset-2' : ''}`}
           >
-            <div className="bg-medsync-blue px-3 lg:px-4 py-2 lg:py-3">
-              <h3 className="text-xs lg:text-sm font-black text-white text-center" style={{fontFamily: 'Nunito, sans-serif'}}>Plano CLÍNICA</h3>
+            <div className="bg-medsync-blue px-3 lg:px-4 py-3 lg:py-4">
+              <h3 className="text-sm lg:text-base font-black text-white text-center" style={{fontFamily: 'Nunito, sans-serif'}}>Plano CLÍNICA</h3>
             </div>
             <div className="text-center px-3 pb-1 pt-2 lg:px-2 lg:pb-2 lg:pt-2">
               {(() => {
@@ -914,7 +904,7 @@ export function PricingSection({ onPlanSelection, selectedPlanId, onAdvanceToPay
           {/* Botão Voltar aos Dados */}
           <button 
             onClick={onBackToForm}
-            className="font-semibold py-3 px-8 rounded-lg transition-colors duration-200 bg-gray-200 hover:bg-gray-300 text-gray-700 flex items-center gap-2"
+            className="font-semibold py-3 px-8 rounded-lg transition-colors duration-200 bg-accent hover:bg-gray-300 text-white flex items-center gap-2"
             style={{fontFamily: 'Nunito, sans-serif'}}
             data-testid="button-back-to-form"
           >

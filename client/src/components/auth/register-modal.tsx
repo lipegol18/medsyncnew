@@ -8,8 +8,7 @@ import { type RegisterForm as RegisterFormType } from '@/schemas/auth-schemas';
 import { type SubscriptionPlan } from '@/types/subscription';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { useSupportContact } from '@/lib/support-contact';
 import { ArrowLeft, CheckCircle2, Clock } from 'lucide-react';
 
 // Stripe configuração removida - agora usamos redirecionamento para Checkout Session
@@ -29,8 +28,8 @@ export function RegisterModal({
   validationErrors,
   onFieldValidation
 }: RegisterModalProps) {
-  // Iniciar no formulário de dados (fluxo normal de registro)
-  const [currentStep, setCurrentStep] = useState<'form' | 'pricing' | 'confirmation' | 'trial-welcome' | 'error'>('form');
+  // Sempre iniciar no formulário de dados (passo 1)
+  const [currentStep, setCurrentStep] = useState<'form' | 'pricing' | 'confirmation' | 'trial-welcome' | 'clinica-contact' | 'error'>('form');
   // Dados do formulário começam vazios para o usuário preencher
   const [formData, setFormData] = useState<RegisterFormType | null>(null);
   const [selectedPlanId, setSelectedPlanId] = useState<number | null>(null);
@@ -40,8 +39,14 @@ export function RegisterModal({
   const [preloadedFormData, setPreloadedFormData] = useState<Partial<RegisterFormType> | null>(null);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { openSupport } = useSupportContact();
   const queryClient = useQueryClient();
   const [crmValidationStatus, setCrmValidationStatus] = useState<{ [key: string]: 'validating' | 'valid' | 'invalid' }>({});
+
+  // Scroll para o topo sempre que o modal for aberto/montado
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
 
   // Buscar planos de assinatura
   const { data: plans } = useQuery<SubscriptionPlan[]>({
@@ -308,10 +313,10 @@ export function RegisterModal({
     }
     
     // NÃO executar ação aqui - apenas marcar plano como selecionado
-    console.log(`📋 Plano ${planId} selecionado (apenas visual)`);
+    console.log(`Plano ${planId} selecionado (apenas visual)`);
   };
 
-  // Função para avançar da seleção de planos para confirmação
+  // Função para avançar da seleção de planos para confirmação ou contato
   const handleAdvanceToConfirmation = async () => {
     if (!selectedPlanId) {
       toast({
@@ -322,11 +327,16 @@ export function RegisterModal({
       return;
     }
 
-    // Fazer scroll para o topo do modal quando transita para confirmação
+    // Fazer scroll para o topo do modal
     window.scrollTo({ top: 0, behavior: 'smooth' });
     
-    // Ir para tela de confirmação
-    setCurrentStep('confirmation');
+    // Se for plano CLÍNICA (id 3), ir para tela de contato
+    if (selectedPlanId === 3) {
+      setCurrentStep('clinica-contact');
+    } else {
+      // Para outros planos, ir para confirmação normal
+      setCurrentStep('confirmation');
+    }
   };
 
   // Função para processar o pagamento final (da confirmação)
@@ -353,12 +363,11 @@ export function RegisterModal({
         <div className="flex items-center space-x-2 sm:space-x-4">
           {/* Etapa 1: Formulário */}
           <div className="flex items-center">
-            <div className={`
-              w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-xs sm:text-sm font-bold
-              ${isCurrent('form') ? 'bg-accent text-white' : 
-                isCompleted('form') ? 'bg-green-500 text-white' : 
-                'bg-gray-300 text-gray-600'}
-            `}>
+            <div className={`breadcrumb-base ${
+              isCurrent('form') ? 'breadcrumb-active' : 
+                isCompleted('form') ? 'breadcrumb-completed' : 
+                'breadcrumb-inactive'
+            }`}>
               {isCompleted('form') ? '✓' : '1'}
             </div>
             <span className={`
@@ -379,12 +388,11 @@ export function RegisterModal({
 
           {/* Etapa 2: Planos */}
           <div className="flex items-center">
-            <div className={`
-              w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-xs sm:text-sm font-bold
-              ${isCurrent('pricing') ? 'bg-accent text-white' : 
-                isCompleted('pricing') ? 'bg-green-500 text-white' : 
-                'bg-gray-300 text-gray-600'}
-            `}>
+            <div className={`breadcrumb-base ${
+              isCurrent('pricing') ? 'breadcrumb-active' : 
+                isCompleted('pricing') ? 'breadcrumb-completed' : 
+                'breadcrumb-inactive'
+            }`}>
               {isCompleted('pricing') ? '✓' : '2'}
             </div>
             <span className={`
@@ -405,12 +413,11 @@ export function RegisterModal({
 
           {/* Etapa 3: Confirmação */}
           <div className="flex items-center">
-            <div className={`
-              w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-xs sm:text-sm font-bold
-              ${isCurrent('confirmation') ? 'bg-accent text-white' : 
-                isCompleted('confirmation') ? 'bg-green-500 text-white' : 
-                'bg-gray-300 text-gray-600'}
-            `}>
+            <div className={`breadcrumb-base ${
+              isCurrent('confirmation') ? 'breadcrumb-active' : 
+                isCompleted('confirmation') ? 'breadcrumb-completed' : 
+                'breadcrumb-inactive'
+            }`}>
               {isCompleted('confirmation') ? '✓' : '3'}
             </div>
             <span className={`
@@ -461,11 +468,11 @@ export function RegisterModal({
         <div className="flex justify-center mb-6 sm:mb-8">
           <div className="relative">
             {/* Badge de economia */}
-            {billingInterval === 'yearly' && (
-              <div className="absolute -top-3 -right-2 bg-green-500 text-white text-xs font-bold px-2 py-1 rounded-full z-20 animate-pulse">
-                💰 Economize 50%
-              </div>
-            )}
+            <div className="absolute -top-3 -right-2 z-20">
+              <span className="inline-block px-2 py-1 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-700 transform rotate-12 shadow-sm" style={{fontFamily: 'Nunito, sans-serif'}}>
+                2 meses grátis
+              </span>
+            </div>
             
             <div className="flex items-center bg-gradient-to-r from-blue-50 to-sky-50 border border-blue-200 rounded-xl p-1.5 shadow-sm">
               <div className="relative flex bg-white rounded-lg shadow-sm">
@@ -478,9 +485,8 @@ export function RegisterModal({
                   }`}
                 />
                 
-                <Button
-                  variant="ghost"
-                  size="sm"
+                <button
+                  type="button"
                   className={`relative z-10 text-sm font-semibold px-6 py-2.5 rounded-lg transition-all duration-300 hover:bg-transparent hover:text-current ${
                     billingInterval === 'monthly' 
                       ? 'text-white' 
@@ -488,11 +494,10 @@ export function RegisterModal({
                   }`}
                   onClick={() => setBillingInterval('monthly')}
                 >
-                  💳 Mensal
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
+                  Mensal
+                </button>
+                <button
+                  type="button"
                   className={`relative z-10 text-sm font-semibold px-6 py-2.5 rounded-lg transition-all duration-300 hover:bg-transparent hover:text-current ${
                     billingInterval === 'yearly' 
                       ? 'text-white' 
@@ -500,8 +505,8 @@ export function RegisterModal({
                   }`}
                   onClick={() => setBillingInterval('yearly')}
                 >
-                  🏆 Anual
-                </Button>
+                  Anual
+                </button>
               </div>
             </div>
           </div>
@@ -538,7 +543,7 @@ export function RegisterModal({
         <div className="px-4 space-y-6">
           {/* Dados Pessoais */}
           <div className="bg-gray-50 rounded-lg p-4">
-            <h3 className="font-bold text-gray-900 mb-3">📋 Dados Pessoais</h3>
+            <h3 className="font-bold text-gray-900 mb-3">Dados Pessoais</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
               <div><span className="text-gray-600">Nome:</span> <span className="font-medium">{formData?.firstName} {formData?.lastName}</span></div>
               <div><span className="text-gray-600">CPF:</span> <span className="font-medium">{formData?.cpf}</span></div>
@@ -551,7 +556,7 @@ export function RegisterModal({
 
           {/* Endereço */}
           <div className="bg-gray-50 rounded-lg p-4">
-            <h3 className="font-bold text-gray-900 mb-3">📍 Endereço</h3>
+            <h3 className="font-bold text-gray-900 mb-3">Endereço</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
               <div><span className="text-gray-600">CEP:</span> <span className="font-medium">{formData?.cep}</span></div>
               <div><span className="text-gray-600">Endereço:</span> <span className="font-medium">{formData?.address}, {formData?.number}</span></div>
@@ -565,13 +570,13 @@ export function RegisterModal({
           {/* Plano Selecionado */}
           {selectedPlan && (
             <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-              <h3 className="font-bold text-gray-900 mb-3">💳 Plano Selecionado</h3>
+              <h3 className="font-bold text-gray-900 mb-3">Plano Selecionado</h3>
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <span className="font-medium text-lg">{selectedPlan.name}</span>
-                  <Badge variant="outline" className="bg-blue-100 text-blue-800">
+                  <span className="inline-flex items-center rounded-md border border-blue-200 bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-blue-800">
                     {billingInterval === 'monthly' ? 'Mensal' : 'Anual'}
-                  </Badge>
+                  </span>
                 </div>
                 <p className="text-gray-600 text-sm">{selectedPlan.description}</p>
                 <div className="flex justify-between items-center pt-2 border-t border-blue-200">
@@ -602,34 +607,144 @@ export function RegisterModal({
 
           {/* Botões de Ação */}
           <div className="flex flex-col sm:flex-row gap-3 pt-4">
-            <Button 
-              variant="outline" 
+            <button 
+              type="button"
               onClick={() => setCurrentStep('pricing')}
-              className="flex-1"
+              className="flex-1 font-semibold py-3 px-8 rounded-lg transition-colors duration-200 bg-accent hover:bg-gray-300 text-white flex items-center justify-center"
               data-testid="button-back-to-pricing"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
               Alterar Plano
-            </Button>
+            </button>
             
-            <Button 
-              variant="outline" 
+            <button 
+              type="button"
               onClick={() => setCurrentStep('form')}
-              className="flex-1"
+              className="flex-1 font-semibold py-3 px-8 rounded-lg transition-colors duration-200 bg-accent hover:bg-gray-300 text-white"
               data-testid="button-back-to-form"
             >
-              ✏️ Editar Dados
-            </Button>
+              Editar Dados
+            </button>
             
-            <Button 
+            <button 
+              type="button"
               onClick={handleFinalizePayment}
               disabled={registerWithPlanMutation.isPending}
-              className="flex-1 bg-blue-600 hover:bg-blue-700"
+              className="flex-1 font-semibold py-3 px-8 rounded-lg transition-colors duration-200 bg-accent hover:bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
               data-testid="button-finalize-payment"
             >
               {registerWithPlanMutation.isPending ? 'Processando...' : 'Finalizar Pagamento'}
-            </Button>
+            </button>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Etapa de contato para plano CLÍNICA
+  if (currentStep === 'clinica-contact') {
+    return (
+      <div className="px-4 py-6">
+        {/* Header */}
+        <div className="text-center mb-6">
+          <div className="flex justify-center mb-4">
+            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
+              <span className="text-2xl">🏥</span>
+            </div>
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            Plano CLÍNICA - Consultoria Personalizada
+          </h2>
+          <p className="text-gray-600 text-sm leading-relaxed">
+            Este plano é customizado para cada empresa.<br/>
+            Nossa equipe comercial entrará em contato em até 24h.
+          </p>
+        </div>
+
+        {/* Benefícios do plano */}
+        <div className="bg-blue-50 rounded-lg p-4 mb-6">
+          <h3 className="font-bold text-blue-900 mb-3">✨ Benefícios Exclusivos</h3>
+          <ul className="space-y-2 text-sm text-blue-800">
+            <li className="flex items-center gap-2">
+              <span className="w-1.5 h-1.5 bg-blue-600 rounded-full"></span>
+              Médicos ilimitados na clínica
+            </li>
+            <li className="flex items-center gap-2">
+              <span className="w-1.5 h-1.5 bg-blue-600 rounded-full"></span>
+              Integração com sistemas existentes
+            </li>
+            <li className="flex items-center gap-2">
+              <span className="w-1.5 h-1.5 bg-blue-600 rounded-full"></span>
+              Suporte técnico dedicado 24/7
+            </li>
+            <li className="flex items-center gap-2">
+              <span className="w-1.5 h-1.5 bg-blue-600 rounded-full"></span>
+              Treinamento da equipe incluso
+            </li>
+            <li className="flex items-center gap-2">
+              <span className="w-1.5 h-1.5 bg-blue-600 rounded-full"></span>
+              Relatórios avançados e analytics
+            </li>
+          </ul>
+        </div>
+
+        {/* Processo */}
+        <div className="bg-gray-50 rounded-lg p-4 mb-6">
+          <h3 className="font-bold text-gray-900 mb-3">Como funciona?</h3>
+          <div className="space-y-3 text-sm text-gray-700">
+            <div className="flex items-start gap-3">
+              <span className="bg-blue-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">1</span>
+              <span>Entre em contato conosco pelo WhatsApp ou formulário</span>
+            </div>
+            <div className="flex items-start gap-3">
+              <span className="bg-blue-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">2</span>
+              <span>Nossa equipe agenda uma reunião para entender suas necessidades</span>
+            </div>
+            <div className="flex items-start gap-3">
+              <span className="bg-blue-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">3</span>
+              <span>Criamos uma proposta personalizada com preço e cronograma</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Opções de contato */}
+        <div className="space-y-4 mb-6">
+          <h3 className="font-bold text-gray-900 text-center">💬 Entre em contato agora:</h3>
+          
+          {/* WhatsApp */}
+          <button
+            onClick={() => openSupport("Olá! Tenho interesse no Plano CLÍNICA do MedSync e gostaria de saber mais informações.", "sales")}
+            className="w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-3 px-4 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
+          >
+            <span className="text-xl">📱</span>
+            Falar via WhatsApp
+          </button>
+
+          {/* Formulário de contato */}
+          <button
+            onClick={() => {
+              toast({
+                title: "Formulário em breve!",
+                description: "Use o WhatsApp para contato imediato ou envie email para contato@medsync.com.br",
+              });
+            }}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
+          >
+            <span className="text-xl">📧</span>
+            Formulário de Contato
+          </button>
+        </div>
+
+        {/* Botões de ação */}
+        <div className="flex flex-col sm:flex-row gap-3">
+          <button 
+            type="button"
+            onClick={() => setCurrentStep('pricing')}
+            className="flex-1 font-semibold py-3 px-8 rounded-lg transition-colors duration-200 bg-accent hover:bg-gray-300 text-white flex items-center justify-center"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Voltar aos Planos
+          </button>
         </div>
       </div>
     );
@@ -687,7 +802,8 @@ export function RegisterModal({
         </div>
 
         {/* Botão para acessar o dashboard */}
-        <Button 
+        <button 
+          type="button"
           onClick={() => {
             console.log('🎯 Redirecionando para dashboard');
             toast({
@@ -699,22 +815,21 @@ export function RegisterModal({
             queryClient.invalidateQueries({ queryKey: ['/api/user'] });
             setLocation('/welcome');
           }}
-          size="lg"
-          className="w-full bg-accent hover:bg-accent/90 text-white font-semibold py-3"
+          className="w-full bg-accent hover:bg-accent/90 text-white font-semibold py-3 rounded-lg"
         >
           Começar a Usar o MedSync
-        </Button>
+        </button>
 
         {/* Botão para voltar */}
-        <Button 
-          variant="ghost" 
+        <button 
+          type="button"
           onClick={() => setCurrentStep('pricing')}
-          className="mt-4 w-full"
+          className="mt-4 w-full py-2 hover:bg-gray-100 rounded-lg transition-colors flex items-center justify-center"
           disabled={registerWithPlanMutation.isPending}
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
           Voltar aos Planos
-        </Button>
+        </button>
       </div>
     );
   }
@@ -753,22 +868,22 @@ export function RegisterModal({
 
         {/* Botões */}
         <div className="space-y-3">
-          <Button 
+          <button 
+            type="button"
             onClick={onSwitchToLogin}
-            size="lg"
-            className="w-full bg-accent hover:bg-accent/90 text-white font-semibold py-3"
+            className="w-full bg-accent hover:bg-accent/90 text-white font-semibold py-3 rounded-lg"
           >
             Fazer Login
-          </Button>
+          </button>
 
-          <Button 
-            variant="outline" 
+          <button 
+            type="button"
             onClick={() => setCurrentStep('form')}
-            className="w-full"
+            className="w-full border border-gray-300 hover:bg-gray-100 py-2 rounded-lg transition-colors flex items-center justify-center"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Tentar Novamente
-          </Button>
+          </button>
         </div>
       </div>
     );
