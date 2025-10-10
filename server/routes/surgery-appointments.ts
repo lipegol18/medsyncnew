@@ -158,7 +158,71 @@ router.get('/', isAuthenticated, async (req, res) => {
       patientName: a.patientName
     })));
 
-    res.json(appointments);
+    // Buscar procedimentos cirúrgicos e condutas para cada agendamento
+    console.log('🔍 Enriquecendo agendamentos com procedimentos e condutas...');
+    const enrichedAppointments = await Promise.all(
+      appointments.map(async (appointment) => {
+        if (!appointment.medicalOrderId) {
+          console.log(`⚠️ Agendamento ${appointment.id} sem medicalOrderId`);
+          return appointment;
+        }
+
+        console.log(`🔎 Buscando dados para agendamento ${appointment.id}, pedido ${appointment.medicalOrderId}`);
+
+        // Buscar procedimento cirúrgico principal
+        const mainProcedure = await db
+          .select({
+            name: surgicalProcedures.name
+          })
+          .from(medicalOrderSurgicalProcedures)
+          .innerJoin(surgicalProcedures, eq(medicalOrderSurgicalProcedures.surgicalProcedureId, surgicalProcedures.id))
+          .where(and(
+            eq(medicalOrderSurgicalProcedures.medicalOrderId, appointment.medicalOrderId),
+            eq(medicalOrderSurgicalProcedures.isMain, true)
+          ))
+          .limit(1);
+
+        // Buscar conduta cirúrgica principal
+        const mainApproach = await db
+          .select({
+            name: surgicalApproaches.name
+          })
+          .from(medicalOrderSurgicalApproaches)
+          .innerJoin(surgicalApproaches, eq(medicalOrderSurgicalApproaches.surgicalApproachId, surgicalApproaches.id))
+          .where(and(
+            eq(medicalOrderSurgicalApproaches.medicalOrderId, appointment.medicalOrderId),
+            eq(medicalOrderSurgicalApproaches.isPrimary, true)
+          ))
+          .limit(1);
+
+        // Buscar caráter da cirurgia (procedureType) do pedido médico
+        const orderDetails = await db
+          .select({
+            procedureType: medicalOrders.procedureType
+          })
+          .from(medicalOrders)
+          .where(eq(medicalOrders.id, appointment.medicalOrderId))
+          .limit(1);
+
+        const enriched = {
+          ...appointment,
+          surgicalProcedureName: mainProcedure[0]?.name || null,
+          surgicalApproachName: mainApproach[0]?.name || null,
+          procedureType: orderDetails[0]?.procedureType || appointment.surgeryType
+        };
+
+        console.log(`✅ Agendamento ${appointment.id} enriquecido:`, {
+          procedure: enriched.surgicalProcedureName,
+          approach: enriched.surgicalApproachName,
+          procedureType: enriched.procedureType
+        });
+
+        return enriched;
+      })
+    );
+
+    console.log('📤 Retornando agendamentos enriquecidos');
+    res.json(enrichedAppointments);
   } catch (error) {
     console.error('❌ Erro ao buscar agendamentos:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
