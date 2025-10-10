@@ -46,6 +46,7 @@ type DiscountCode = {
   validUntil?: string;
   applicablePlans?: number[];
   isActive: boolean;
+  isAutomatic?: boolean;
   paymentProvider: string;
   externalCouponId?: string;
   externalPromotionCodeId?: string;
@@ -66,6 +67,7 @@ type CreateDiscountCodeData = {
   validUntil?: string;
   applicablePlans?: number[];
   isActive: boolean;
+  isAutomatic?: boolean;
   paymentProvider: string;
   minimumAmount?: number;
   firstTimeTransaction: boolean;
@@ -302,6 +304,8 @@ export default function AdminDiscountCodesPage() {
   const activeCodesCount = codes.filter(code => code.isActive).length;
   const stripeCodesCount = codes.filter(code => code.paymentProvider === 'stripe').length;
   const syncedCodesCount = codes.filter(code => code.syncStatus === 'synced').length;
+  const automaticCodesCount = codes.filter(code => code.isAutomatic).length;
+  const automaticCode = codes.find(code => code.isAutomatic);
 
   return (
     <div className="space-y-6">
@@ -562,7 +566,7 @@ export default function AdminDiscountCodesPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-5">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total de Códigos</CardTitle>
@@ -579,6 +583,22 @@ export default function AdminDiscountCodesPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600" data-testid="stat-active-codes">{activeCodesCount}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Desconto Automático</CardTitle>
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-orange-600" data-testid="stat-automatic-codes">
+              {automaticCode ? automaticCode.code : "Nenhum"}
+            </div>
+            {automaticCode && (
+              <p className="text-xs text-muted-foreground mt-1">
+                {formatDiscount(automaticCode.discountType, automaticCode.discountValue)}
+              </p>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -628,6 +648,7 @@ export default function AdminDiscountCodesPage() {
                 <TableHead>Validade</TableHead>
                 <TableHead>Provedor</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Automático</TableHead>
                 <TableHead>Sincronização</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
@@ -635,13 +656,13 @@ export default function AdminDiscountCodesPage() {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center py-8">
+                  <TableCell colSpan={10} className="text-center py-8">
                     Carregando códigos de desconto...
                   </TableCell>
                 </TableRow>
               ) : filteredCodes.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center py-8">
+                  <TableCell colSpan={10} className="text-center py-8">
                     Nenhum código de desconto encontrado
                   </TableCell>
                 </TableRow>
@@ -673,6 +694,22 @@ export default function AdminDiscountCodesPage() {
                       <Badge variant={code.isActive ? 'default' : 'secondary'}>
                         {code.isActive ? 'Ativo' : 'Inativo'}
                       </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={code.isAutomatic || false}
+                          onCheckedChange={(checked) => {
+                            const payload = { isAutomatic: checked };
+                            updateMutation.mutate({ id: code.id, data: payload });
+                          }}
+                          disabled={updateMutation.isPending}
+                          data-testid={`switch-automatic-${code.id}`}
+                        />
+                        <span className="text-sm text-muted-foreground">
+                          {code.isAutomatic ? 'Sim' : 'Não'}
+                        </span>
+                      </div>
                     </TableCell>
                     <TableCell>
                       {getSyncStatusBadge(code.syncStatus, code.syncErrorMessage)}
