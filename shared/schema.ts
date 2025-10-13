@@ -570,6 +570,7 @@ export const medicalOrders = pgTable("medical_orders", {
   clinicalJustification: text("clinical_justification"), // Sugestão de justificativa clínica para o procedimento
   procedureLaterality: cidLateralityEnum("procedure_laterality"), // Lateralidade do procedimento principal: esquerdo, direito ou bilateral
   procedureType: procedureTypeEnum("procedure_type"), // Tipo de procedimento: eletiva ou urgência
+  anatomicalRegionId: integer("anatomical_region_id").references(() => anatomicalRegions.id), // Região anatômica selecionada
   // CIDs, OPME Items e Suppliers agora são gerenciados via tabelas relacionais
   // Campo unificado de anexos (substitui exam_images_url, medical_report_url e order_pdf_url)
   attachments: jsonb("attachments").default('[]'), // Array de objetos JSON com todos os anexos
@@ -591,6 +592,7 @@ export const insertMedicalOrderSchema = createInsertSchema(medicalOrders).pick({
   clinicalIndication: true,
   procedureLaterality: true,
   procedureType: true,
+  anatomicalRegionId: true,
   additionalNotes: true,
   statusId: true, // Status do pedido (FK para order_statuses)
   complexity: true,
