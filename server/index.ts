@@ -15,7 +15,7 @@ app.use(cookieParser());
 // Configure CORS para permitir chamadas de aplicações mobile e domínio público
 app.use(cors({
   origin: [
-    "http://localhost:5001", 
+    "http://localhost:5000", 
     "http://localhost:3000",
     "https://medsync.replit.app",
     "https://*.replit.app"
@@ -124,6 +124,17 @@ app.use((req, res, next) => {
     throw err;
   });
 
+  // Servir arquivos especiais ANTES do Vite para evitar interceptação
+  // Add favicon to prevent 503 errors
+  app.get('/favicon.ico', (req, res) => {
+    res.status(204).end();
+  });
+  
+  // Servir o style-guide.html diretamente
+  app.get('/style-guide', (req, res) => {
+    res.sendFile(path.join(process.cwd(), 'style-guide.html'));
+  });
+
   // Middleware de fallback para API - capturar rotas /api/* não encontradas
   // DEVE vir ANTES do setupVite para evitar que Vite sirva HTML para APIs
   app.use("/api", (req, res) => {
@@ -144,11 +155,6 @@ app.use((req, res, next) => {
   } else {
     serveStatic(app);
   }
-  
-  // Add favicon to prevent 503 errors
-  app.get('/favicon.ico', (req, res) => {
-    res.status(204).end();
-  });
   
   // Force fresh assets with robust headers
   app.use('/assets/*', (req, res, next) => {
@@ -309,10 +315,10 @@ app.use((req, res, next) => {
     res.send(html);
   });
 
-  // ALWAYS serve the app on port 5001
+  // ALWAYS serve the app on port 5000
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
-  const port = 5001;
+  const port = 5000;
   server.listen({
     port,
     host: "0.0.0.0",
