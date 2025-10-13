@@ -29,6 +29,7 @@ import Checkout from "@/pages/checkout";
 import CheckoutSuccess from "@/pages/checkout-success";
 import CheckoutCancel from "@/pages/checkout-cancel";
 import StripeTest from "@/pages/stripe-test";
+import LogoTest from "@/pages/logo-test";
 
 import OpmeMaterials from "@/pages/admin/opme-materials";
 import CidCodes from "@/pages/admin/cid-codes";
@@ -82,6 +83,7 @@ function Router() {
       <ProtectedRoute path="/test-order-preview" component={TestOrderPreview} />
       <ProtectedRoute path="/manufacturer-demo" component={ManufacturerDemo} />
       <ProtectedRoute path="/font-demo" component={FontDemo} />
+      <ProtectedRoute path="/logo-test" component={LogoTest} />
       
       {/* Subscription and Payment Routes */}
       <ProtectedRoute path="/subscription-plans" component={SubscriptionPlans} />
