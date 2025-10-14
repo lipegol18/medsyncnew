@@ -468,8 +468,8 @@ export function setupAuth(app: Express) {
             priceId: billingInterval === 'yearly' ? plan.priceIdYearly : plan.priceIdMonthly, // Usar preço baseado no billingInterval
             mode: 'subscription' as const,
             customerData: customerData, // Dados para criação automática do Customer
-            successUrl: `${process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : 'http://localhost:5001'}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-            cancelUrl: `${process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : 'http://localhost:5001'}/checkout/cancel`,
+            successUrl: `${process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : 'http://localhost:5000'}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
+            cancelUrl: `${process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : 'http://localhost:5000'}/checkout/cancel`,
             couponId: discountCode?.externalCouponId || undefined, // Cupom gerenciado pelo StripeProvider
             metadata
           };
