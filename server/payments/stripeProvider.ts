@@ -161,7 +161,18 @@ export class StripeProvider implements PaymentProvider {
 
   async createCheckoutSession(input: CheckoutInput): Promise<CheckoutResult> {
     try {
-      console.log(`🚀 [Stripe] Criando sessão de checkout: ${input.priceId}`);
+      console.log('\n🎯 [StripeProvider] ========== INÍCIO: createCheckoutSession ==========');
+      console.log('📥 Input recebido:', JSON.stringify({
+        priceId: input.priceId,
+        mode: input.mode,
+        successUrl: input.successUrl,
+        cancelUrl: input.cancelUrl,
+        couponId: input.couponId,
+        hasCustomerId: !!input.customerId,
+        hasCustomerData: !!input.customerData,
+        customerEmail: input.customerData?.email,
+        metadata: input.metadata
+      }, null, 2));
       
       let customerId = input.customerId;
       
@@ -219,15 +230,42 @@ export class StripeProvider implements PaymentProvider {
 
       const session = await this.stripe.checkout.sessions.create(sessionData);
       
-      console.log(`✅ [Stripe] Sessão criada com sucesso: ${session.id}`);
-      console.log(`🔗 [Stripe] URL do checkout: ${session.url}`);
+      console.log('\n✅ [StripeProvider] Sessão de Checkout criada:');
+      console.log('🆔 Session ID:', session.id);
+      console.log('🔗 URL:', session.url);
+      console.log('💵 Valor:', session.amount_total ? `${session.amount_total / 100} ${session.currency?.toUpperCase()}` : 'N/A');
+      console.log('👤 Customer:', session.customer || 'Não definido');
+      console.log('🎫 Desconto aplicado:', session.total_details?.amount_discount ? 'Sim' : 'Não');
+      console.log('========== FIM: createCheckoutSession ==========\n');
       
       return {
         id: session.id,
         url: session.url || undefined
       };
     } catch (error: any) {
-      console.error('❌ [Stripe] Erro ao criar checkout:', error);
+      console.error('\n💥 [StripeProvider] ========== ERRO NO CHECKOUT ==========');
+      console.error('🚨 Tipo:', error.constructor?.name || 'Unknown');
+      console.error('📝 Mensagem:', error.message);
+      console.error('📊 Código:', error.code || 'N/A');
+      console.error('🔍 Type:', error.type || 'N/A');
+      
+      // Dados específicos do Stripe
+      if (error.raw) {
+        console.error('📦 Raw Error:', JSON.stringify(error.raw, null, 2));
+      }
+      
+      if (error.statusCode) {
+        console.error('🌐 HTTP Status:', error.statusCode);
+      }
+      
+      if (error.param) {
+        console.error('⚙️ Parâmetro com erro:', error.param);
+      }
+      
+      // Stack trace completo
+      console.error('📚 Stack trace:', error.stack);
+      console.error('========== FIM: ERRO NO CHECKOUT ==========\n');
+      
       throw new PaymentError('CHECKOUT_CREATION_FAILED', `Falha ao criar checkout: ${error.message}`);
     }
   }
