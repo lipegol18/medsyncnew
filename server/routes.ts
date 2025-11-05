@@ -12349,6 +12349,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           riskClass: opmeItems.riskClass,
           manufacturerName: opmeItems.manufacturerName,
           quantity: surgicalApproachOpmeItems.quantity,
+          displayOrder: surgicalApproachOpmeItems.displayOrder,
           isRequired: surgicalApproachOpmeItems.isRequired,
           notes: surgicalApproachOpmeItems.notes,
           alternativeItems: surgicalApproachOpmeItems.alternativeItems,
@@ -12359,7 +12360,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           eq(surgicalApproachOpmeItems.surgicalApproachId, approachId),
           eq(surgicalApproachOpmeItems.surgicalProcedureId, procedureId)
         ))
-        .orderBy(opmeItems.technicalName, opmeItems.commercialName);
+        .orderBy(asc(surgicalApproachOpmeItems.displayOrder), surgicalApproachOpmeItems.isRequired);
 
       // Buscar Fornecedores associados ao procedimento + conduta específicos
       const suppliersList = await db
