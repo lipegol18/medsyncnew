@@ -1,6 +1,7 @@
 /**
  * Implementação do PaymentProvider para Stripe
  * Adapta a API do Stripe para nossa interface genérica
+ * teste
  */
 
 import Stripe from "stripe";
