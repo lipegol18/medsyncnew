@@ -33,7 +33,7 @@ const getCorsOrigins = () => {
 
   // Only allow localhost in development environment for security
   if (isDevelopment()) {
-    origins.push("http://localhost:5000");
+    origins.push("http://localhost:5001");
     origins.push("http://localhost:3000");
   }
 
@@ -352,7 +352,7 @@ app.use((req, res, next) => {
   // ALWAYS serve the app on port 5000
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
-  const port = 5000;
+  const port = 5001;
   server.listen(
     {
       port,
