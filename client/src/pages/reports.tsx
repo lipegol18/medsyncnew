@@ -582,7 +582,7 @@ function ReceivedValuesTab({ appliedFilters }: { appliedFilters: any }) {
   return (
     <div className="space-y-6">
       {/* Cards de estatísticas */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card className="border-border bg-card shadow-lg">
           <CardHeader className="pb-2">
             <CardTitle className="text-card-foreground text-lg">
@@ -627,6 +627,41 @@ function ReceivedValuesTab({ appliedFilters }: { appliedFilters: any }) {
               {statistics.averageValue?.toLocaleString("pt-BR", {
                 minimumFractionDigits: 2,
               }) || "0,00"}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-border bg-card shadow-lg">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-card-foreground text-lg">
+              Status de Pagamento
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Recebidas:</span>
+                <span className="text-xl font-bold text-emerald-600">
+                  {statistics.surgeriesWithPayment || 0}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Pendentes:</span>
+                <span className="text-xl font-bold text-amber-600">
+                  {statistics.surgeriesPendingPayment || 0}
+                </span>
+              </div>
+              <div className="border-t border-border pt-2 mt-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-muted-foreground">Total:</span>
+                  <span className="text-lg font-bold" style={{ color: "var(--medsync-light-blue)" }}>
+                    {statistics.totalSurgeries || 0}
+                  </span>
+                </div>
+                <div className="text-xs text-muted-foreground text-center mt-1">
+                  {statistics.paymentRate?.toFixed(1) || "0.0"}% recebidas
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -684,6 +719,73 @@ function ReceivedValuesTab({ appliedFilters }: { appliedFilters: any }) {
                 />
               </LineChart>
             </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Tabela de Cirurgias Pendentes de Pagamento */}
+      {receivedValuesData?.pendingSurgeries && receivedValuesData.pendingSurgeries.length > 0 && (
+        <Card className="border-border bg-card shadow-lg">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-card-foreground flex items-center gap-2">
+              <span className="text-amber-600">⏳</span>
+              Cirurgias Pendentes de Pagamento
+            </CardTitle>
+            <CardDescription className="text-muted-foreground">
+              {receivedValuesData.pendingSurgeries.length} {receivedValuesData.pendingSurgeries.length === 1 ? 'cirurgia aguardando' : 'cirurgias aguardando'} recebimento de valores
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="rounded-lg border border-border overflow-hidden">
+              <table className="w-full">
+                <thead className="bg-muted">
+                  <tr>
+                    <th className="text-left p-3 text-sm font-semibold text-muted-foreground">ID</th>
+                    <th className="text-left p-3 text-sm font-semibold text-muted-foreground">Paciente</th>
+                    <th className="text-left p-3 text-sm font-semibold text-muted-foreground">Hospital</th>
+                    <th className="text-left p-3 text-sm font-semibold text-muted-foreground">Procedimento</th>
+                    <th className="text-left p-3 text-sm font-semibold text-muted-foreground">Data</th>
+                    <th className="text-left p-3 text-sm font-semibold text-muted-foreground">Status</th>
+                    <th className="text-center p-3 text-sm font-semibold text-muted-foreground">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {receivedValuesData.pendingSurgeries.map((surgery: any) => (
+                    <tr key={surgery.orderId} className="hover:bg-accent transition-colors">
+                      <td className="p-3 text-sm font-mono text-card-foreground">
+                        #{surgery.orderId}
+                      </td>
+                      <td className="p-3 text-sm text-card-foreground">
+                        {surgery.patientName}
+                      </td>
+                      <td className="p-3 text-sm text-card-foreground">
+                        {surgery.hospitalName}
+                      </td>
+                      <td className="p-3 text-sm text-card-foreground max-w-xs truncate" title={surgery.procedures}>
+                        {surgery.procedures}
+                      </td>
+                      <td className="p-3 text-sm text-card-foreground">
+                        {surgery.procedureDate 
+                          ? new Date(surgery.procedureDate).toLocaleDateString("pt-BR")
+                          : "Não agendada"}
+                      </td>
+                      <td className="p-3 text-sm text-card-foreground">
+                        {surgery.statusName || "N/A"}
+                      </td>
+                      <td className="p-3 text-center">
+                        <button
+                          onClick={() => window.location.href = `/order-details/${surgery.orderId}`}
+                          className="text-xs px-3 py-1 rounded bg-medsync-blue hover:bg-medsync-dark-blue text-white transition-colors"
+                          data-testid={`button-view-pending-${surgery.orderId}`}
+                        >
+                          Ver Detalhes
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </CardContent>
         </Card>
       )}
