@@ -1,7 +1,6 @@
 /**
  * Implementação do PaymentProvider para Stripe
- * Adapta a API do Stripe para nossa interface genérica
- * teste
+ * Adapta a API do Stripe para nossa interface genérica  qsdad
  */
 
 import Stripe from "stripe";
@@ -249,34 +248,7 @@ export class StripeProvider implements PaymentProvider {
 
       // Sempre permitir códigos promocionais manuais
       sessionData.allow_promotion_codes = true;
-      console.log(`🎫 [Stripe] Habilitando códigos promocionais manuais`);
-
-      // Aplicar cupom automático se fornecido
-      if (input.couponId) {
-        if (input.mode === "subscription") {
-          // Para subscriptions, usar subscription_data.discounts
-          (sessionData as any).subscription_data = {
-            discounts: [
-              {
-                coupon: input.couponId,
-              },
-            ],
-          };
-          console.log(
-            `🎫 [Stripe] Aplicando cupom automático via subscription_data: ${input.couponId}`,
-          );
-        } else {
-          // Para payments (modo pagamento único), usar discounts no nível raiz
-          sessionData.discounts = [
-            {
-              coupon: input.couponId,
-            },
-          ];
-          console.log(
-            `🎫 [Stripe] Aplicando cupom automático via discounts (payment mode): ${input.couponId}`,
-          );
-        }
-      }
+      console.log(`🎫 [Stripe] Habilitando códigos promocionais manuais (campo vazio - usuário digita o código)`);
 
       // Para compliance fiscal brasileiro - CPF já adicionado como tax_id no Customer
       // Custom fields removidos temporariamente devido a incompatibilidade da API
