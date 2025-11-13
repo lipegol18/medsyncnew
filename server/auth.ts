@@ -3,12 +3,12 @@ import { Strategy as LocalStrategy } from "passport-local";
 import { Express } from "express";
 import session from "express-session";
 import { randomBytes } from "crypto";
-import { storage } from "./storage";
 import { User as SelectUser } from "@shared/schema";
 import connectPg from "connect-pg-simple";
 import { pool, db } from "./db";
 import { hashPassword, comparePasswords } from "./utils";
 import { sendPasswordResetEmail } from "./sendgrid";
+import { storage } from "./storage";
 import { WebhookService } from "./services/webhook-service";
 import { discountCodes } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
@@ -24,7 +24,7 @@ declare global {
 }
 
 export function setupAuth(app: Express) {
-  const isProduction = process.env.NODE_ENV === "development";
+  const isProduction = process.env.NODE_ENV === "production";
   console.log(
     "🔐 Configurando autenticação - Ambiente:",
     isProduction ? "production" : "development",
@@ -567,7 +567,6 @@ export function setupAuth(app: Express) {
             customerData: customerData, // Dados para criação automática do Customer
             successUrl,
             cancelUrl,
-            couponId: discountCode?.externalCouponId || undefined, // Cupom gerenciado pelo StripeProvider
             metadata,
           };
 
