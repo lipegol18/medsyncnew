@@ -1181,7 +1181,7 @@ export function hasPermission(permission: string) {
 }
 
 // Função auxiliar para verificação síncrona de permissões
-// Útil para verificações dentro de outros handlers de rotas
+// Útil para verificações dentro de outros handlers de rotas   asdasd
 export function hasPermissionCheck(req: any, permission: string): boolean {
   if (!req.isAuthenticated() || !req.user) {
     return false;
