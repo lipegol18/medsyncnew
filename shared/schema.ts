@@ -3,7 +3,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations, sql } from "drizzle-orm";
 
-// Especialidades Médicas
+// Especialidades Médicas adadsada
 export const medicalSpecialties = pgTable("medical_specialties", {
   id: serial("id").primaryKey(),
   name: text("name").notNull().unique(), // Ex: "Ortopedista", "Neurocirurgião", "Dermatologista"
