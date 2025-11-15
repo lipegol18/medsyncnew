@@ -11,7 +11,7 @@ import { getBaseUrl, isReplit, isDevelopment } from "./utils/environment";
 const app = express();
 
 // IMPORTANTE: Aplicar express.raw() APENAS para a rota do webhook Stripe
-// O Stripe precisa do corpo bruto (raw body) para verificar a assinatura
+// O Stripe precisa do corpo bruto (raw body) para verificar a assinatura dsds
 // Esta condição DEVE vir ANTES do express.json()
 app.use((req, res, next) => {
   if (req.path === '/api/webhooks/stripe') {
@@ -33,7 +33,7 @@ const getCorsOrigins = () => {
 
   // Only allow localhost in development environment for security
   if (isDevelopment()) {
-    origins.push("http://localhost:5001");
+    origins.push("http://localhost:5000");
     origins.push("http://localhost:3000");
   }
 
@@ -146,6 +146,12 @@ app.use((req, res, next) => {
   // Add discount codes routes
   const discountCodesRoutes = await import("./routes/discount-codes");
   app.use("/api/discount-codes", discountCodesRoutes.default);
+
+  // Add discount admin routes (new 3-table architecture)
+  const { getPaymentProvider } = await import("./payments");
+  const createDiscountAdminRouter = await import("./routes/discounts-admin-routes");
+  const stripeProvider = getPaymentProvider();
+  app.use("/api/admin/discounts", createDiscountAdminRouter.default(stripeProvider as any));
 
   // Adicionar rotas para arquivos estáticos (mockups, etc)
   addStaticRoutes(app);
@@ -352,7 +358,7 @@ app.use((req, res, next) => {
   // ALWAYS serve the app on port 5000
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
-  const port = 5001;
+  const port = 5000;
   server.listen(
     {
       port,
