@@ -35,7 +35,7 @@ import {
   incompleteRegistrations, type IncompleteRegistration, type InsertIncompleteRegistration
 } from "@shared/schema";
 import { db, pool } from "./db";
-import { eq, desc, ilike, and, isNull, is, gt, or, sql, ne, gte, lt, inArray } from "drizzle-orm";
+import { eq, desc, ilike, and, isNull, is, gt, or, sql, ne, gte, lt, inArray, notInArray, exists } from "drizzle-orm";
 import connectPg from "connect-pg-simple";
 import session from "express-session";
 import { hashPassword } from "./utils";
