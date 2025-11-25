@@ -1,6 +1,6 @@
 import {
   patients, type Patient, type InsertPatient,
-  healthInsuranceProviders, type HealthInsuranceProvider, type InsertHealthInsuranceProvider,
+  healthInsuranceProviders, type Healt\hInsuranceProvider, type InsertHealthInsuranceProvider,
   healthInsurancePlans, type HealthInsurancePlan, type InsertHealthInsurancePlan,
   opmeItems, type OpmeItem, type InsertOpmeItem,
   opmeSuppliers, type OpmeSupplier, type InsertOpmeSupplier,
@@ -72,7 +72,7 @@ function hexToTailwindClasses(hexColor: string) {
     };
   }
 
-  // Verificar primeiro se é amarelo (prioridade sobre vermelho para cores claras)
+  // Verificar primeiro se é amarelo (prioridade sobre vermelho para cores claras)  dfsdfdsf
   if ((r > 220 && g > 220 && b < 200) || (r > 240 && g > 230 && b < 180)) {
     // Amarelo ou amarelo claro como #FFF59D
     return {
