@@ -142,11 +142,6 @@ export default function ProcedureAssociationsPage() {
     queryKey: ["/api/admin/surgical-approaches"],
   });
 
-  // Para o modal de criação, ainda precisamos carregar os dados básicos
-  const { data: cidCodes = [] } = useQuery({
-    queryKey: ["/api/admin/cid-codes"],
-  });
-
   // const { data: cbhpmProcedures = [] } = useQuery({
   //   queryKey: ["/api/admin/cbhpm-procedures"],
   // });
@@ -160,7 +155,7 @@ export default function ProcedureAssociationsPage() {
   // });
 
   // const { data: clinicalJustifications = [] } = useQuery({
-  //   queryKey: ["/api/admin/clinical-justifications"],
+  //   queryKey: ["/api/admin/clinical-justifications"], fsdf
   // });
 
   // Buscar associações existentes para um procedimento
@@ -1190,36 +1185,6 @@ export default function ProcedureAssociationsPage() {
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-
-              <div>
-                <Label>Códigos CID-10</Label>
-                <div className="max-h-40 overflow-y-auto border rounded p-2 space-y-2">
-                  {(cidCodes as CidCode[]).map((cid: CidCode) => (
-                    <div key={cid.id} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`cid-${cid.id}`}
-                        checked={formData.cidCodeIds.includes(cid.id)}
-                        onCheckedChange={(checked) => {
-                          if (checked) {
-                            setFormData({
-                              ...formData,
-                              cidCodeIds: [...formData.cidCodeIds, cid.id],
-                            });
-                          } else {
-                            setFormData({
-                              ...formData,
-                              cidCodeIds: formData.cidCodeIds.filter(id => id !== cid.id),
-                            });
-                          }
-                        }}
-                      />
-                      <Label htmlFor={`cid-${cid.id}`} className="text-sm">
-                        {cid.code} - {cid.description}
-                      </Label>
-                    </div>
-                  ))}
-                </div>
               </div>
             </div>
             <DialogFooter>
