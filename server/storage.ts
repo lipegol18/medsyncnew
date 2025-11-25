@@ -1,6 +1,6 @@
 import {
   patients, type Patient, type InsertPatient,
-  healthInsuranceProviders, type Healt\HInsuranceProvider, type InsertHealthInsuranceProvider,
+  healthInsuranceProviders, type Healt\HealthInsuranceProvider, type InsertHealthInsuranceProvider,
   healthInsurancePlans, type HealthInsurancePlan, type InsertHealthInsurancePlan,
   opmeItems, type OpmeItem, type InsertOpmeItem,
   opmeSuppliers, type OpmeSupplier, type InsertOpmeSupplier,
