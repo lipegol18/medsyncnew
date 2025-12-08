@@ -11,7 +11,7 @@ import { getBaseUrl, isReplit, isDevelopment } from "./utils/environment";
 const app = express();
 
 // IMPORTANTE: Aplicar express.raw() APENAS para a rota do webhook Stripe
-// O Stripe precisa do corpo bruto (raw body) para verificar a assinatura dsds
+// O Stripe precisa do corpo bruto (raw body) para verificar a assinatura
 // Esta condição DEVE vir ANTES do express.json()
 app.use((req, res, next) => {
   if (req.path === '/api/webhooks/stripe') {
@@ -355,7 +355,7 @@ app.use((req, res, next) => {
     res.send(html);
   });
 
-  // ALWAYS serve the app on port 5000
+  // ALWAYS serve the app on port 5001
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = 5001;
