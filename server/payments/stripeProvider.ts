@@ -246,9 +246,23 @@ export class StripeProvider implements PaymentProvider {
         console.log(`👤 [Stripe] Usando Customer: ${customerId}`);
       }
 
-      // Sempre permitir códigos promocionais manuais
-      sessionData.allow_promotion_codes = true;
-      console.log(`🎫 [Stripe] Habilitando códigos promocionais manuais (campo vazio - usuário digita o código)`);
+      // Configurar códigos promocionais baseado nos parâmetros
+      // IMPORTANTE: Stripe não permite usar 'discounts' junto com 'allow_promotion_codes'
+      // Devemos escolher um OU outro
+      if (input.promotionCodeId) {
+        // Aplicar código promocional específico via discounts (não usar allow_promotion_codes)
+        sessionData.discounts = [{ promotion_code: input.promotionCodeId }];
+        // NÃO definir allow_promotion_codes quando usando discounts
+        console.log(`🎫 [Stripe] Código promocional fixo aplicado via discounts: ${input.promotionCodeId}`);
+      } else if (input.allowPromotionCodes === false) {
+        // Desabilitar códigos promocionais explicitamente (sem discounts)
+        sessionData.allow_promotion_codes = false;
+        console.log(`🎫 [Stripe] Códigos promocionais desabilitados`);
+      } else {
+        // Permitir códigos promocionais manuais (padrão para planos mensais)
+        sessionData.allow_promotion_codes = true;
+        console.log(`🎫 [Stripe] Habilitando códigos promocionais manuais (usuário pode digitar código)`);
+      }
 
       // Para compliance fiscal brasileiro - CPF já adicionado como tax_id no Customer
       // Custom fields removidos temporariamente devido a incompatibilidade da API
@@ -1007,7 +1021,7 @@ export class StripeProvider implements PaymentProvider {
   }
 
   /**
-   * Buscar código promocional pelo código digitável (não pelo ID)333333
+   * Buscar código promocional pelo código digitável (não pelo ID)
    */
   async findPromotionCodeByCode(code: string): Promise<Stripe.PromotionCode | null> {
     try {
