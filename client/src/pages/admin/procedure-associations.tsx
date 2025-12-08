@@ -42,6 +42,7 @@ import { Separator } from "@/components/ui/separator";
 import { CreateProcedureModal } from "@/components/CreateProcedureModal";
 import { CreateApproachModal } from "@/components/CreateApproachModal";
 import CloneAssociationsModal from "@/components/CloneAssociationsModal";
+import { RichTextEditor } from "@/components/rich-text-editor";
 
 type AnatomicalRegion = {
   id: number;
@@ -155,7 +156,7 @@ export default function ProcedureAssociationsPage() {
   // });
 
   // const { data: clinicalJustifications = [] } = useQuery({
-  //   queryKey: ["/api/admin/clinical-justifications"], fsdf
+  //   queryKey: ["/api/admin/clinical-justifications"],
   // });
 
   // Buscar associações existentes para um procedimento
@@ -2162,30 +2163,28 @@ export default function ProcedureAssociationsPage() {
                           {/* Campo único para justificativa */}
                           <div className="mb-4">
                             <div className="space-y-2">
-                              <textarea
-                                className="w-full min-h-[100px] p-3 border border-teal-200 rounded-md text-sm resize-vertical"
-                                placeholder="Digite a justificativa clínica para esta combinação procedimento + conduta..."
+                              <RichTextEditor
                                 value={(() => {
                                   const existingJustification = approachDetails.clinicalJustifications?.[0];
                                   return editingJustification === existingJustification?.id 
                                     ? justificationContent 
                                     : existingJustification?.content || newJustificationContent;
-                                })()} 
-                                onChange={(e) => {
+                                })()}
+                                onChange={(value) => {
                                   const existingJustification = approachDetails.clinicalJustifications?.[0];
-                                  if (existingJustification && editingJustification === existingJustification.id) {
-                                    setJustificationContent(e.target.value);
+                                  if (existingJustification) {
+                                    if (editingJustification !== existingJustification.id) {
+                                      setEditingJustification(existingJustification.id);
+                                      setJustificationContent(existingJustification.content);
+                                    }
+                                    setJustificationContent(value);
                                   } else {
-                                    setNewJustificationContent(e.target.value);
+                                    setNewJustificationContent(value);
                                   }
                                 }}
-                                onFocus={() => {
-                                  const existingJustification = approachDetails.clinicalJustifications?.[0];
-                                  if (existingJustification && editingJustification !== existingJustification.id) {
-                                    setEditingJustification(existingJustification.id);
-                                    setJustificationContent(existingJustification.content);
-                                  }
-                                }}
+                                placeholder="Digite a justificativa clínica para esta combinação procedimento + conduta..."
+                                minHeight="min-h-[150px]"
+                                className="border-teal-200"
                               />
                               <div className="flex gap-2">
                                 {(() => {
