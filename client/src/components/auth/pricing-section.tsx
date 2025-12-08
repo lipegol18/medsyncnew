@@ -914,7 +914,7 @@ export function PricingSection({ onPlanSelection, selectedPlanId, onAdvanceToPay
             Voltar aos Dados
           </button>
           
-          {/* Botão dinâmico baseado no plano selecionado */}
+          {/* Botão dinâmico baseado no plano selecionaddo */}
           <button
             onClick={onAdvanceToPayment}
             disabled={!selectedPlanCard}
