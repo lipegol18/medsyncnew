@@ -1398,7 +1398,7 @@ export default function Reports() {
     return queryString ? `${baseUrl}${separator}${queryString}` : baseUrl;
   };
 
-  // Função para aplicar filtros
+  // Função para aplicar filtros  fff
   const handleApplyFilters = () => {
     setFiltersLoading(true);
 
