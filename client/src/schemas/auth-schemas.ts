@@ -8,7 +8,7 @@ export const loginSchema = z.object({
   remember: z.boolean().optional()
 });
 
-// Register schema
+// Register schema ff
 export const registerSchema = z.object({
   firstName: z.string().min(1, 'Nome é obrigatório'),
   lastName: z.string().min(1, 'Sobrenome é obrigatório'),
