@@ -9,3 +9,5 @@ vite.config.ts.*
 /uploads
 /docs
 /migrations
+*.replit
+*.dump
