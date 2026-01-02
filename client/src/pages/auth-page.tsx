@@ -126,26 +126,28 @@ export default function AuthPage() {
     };
   }, []);
 
-  // Redirect authenticated users to welcome page
-  useEffect(() => {
-    if (!isLoading && user) {
-      setLocation("/welcome");
-    }
-  }, [user, isLoading, setLocation]);
-
-  // Check for reset password token in URL
+  // Check for reset password token in URL FIRST, then redirect if needed
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const resetToken = urlParams.get("reset");
+    
+    // Se há token de reset, mostrar formulário de reset (mesmo se logado)
     if (resetToken) {
       setShowResetForm(true);
+      setModalType("forgot-password"); // IMPORTANTE: Mudar para o modal correto
       setShowModal(true);
       toast({
         title: "Token de recuperação detectado",
         description: "Digite sua nova senha abaixo",
       });
+      return; // Não redirecionar, mostrar form de reset
     }
-  }, [toast]);
+    
+    // Só redirecionar se NÃO há token de reset e usuário está logado
+    if (!isLoading && user) {
+      setLocation("/welcome");
+    }
+  }, [user, isLoading, setLocation, toast]);
 
   // Mutations
   const loginMutation = useMutation({
@@ -173,43 +175,35 @@ export default function AuthPage() {
 
   const forgotPasswordMutation = useMutation({
     mutationFn: async (data: ForgotPasswordForm) => {
-      // Fazer a chamada para a API interna
-      // O webhook N8N é enviado automaticamente pelo backend com autenticação Bearer
+      // O webhook N8N envia o email de recuperação via automação externa
       // Ver: server/auth.ts (endpoint /api/forgot-password)
-      const result = await apiRequest("/api/forgot-password", "POST", data);
-
-      return result;
+      return await apiRequest("/api/forgot-password", "POST", data);
     },
     onSuccess: (response: any) => {
       setResetEmailSent(true);
 
       if (response.token) {
-        // Modo desenvolvimento - exibir token diretamente
+        // Modo desenvolvimento - webhook falhou, exibir token diretamente
         toast({
-          title: "Email falhou - Modo Desenvolvimento",
-          description: `Acesse: ${window.location.origin}/auth?reset=${response.token}`,
-          variant: "destructive",
+          title: "Modo Desenvolvimento",
+          description: `Link copiado para área de transferência`,
         });
 
-        // Opcionalmente, copiar URL para clipboard
+        // Copiar URL para clipboard
+        const resetUrl = `${window.location.origin}/auth?reset=${response.token}`;
         if (navigator.clipboard) {
-          navigator.clipboard.writeText(
-            `${window.location.origin}/auth?reset=${response.token}`,
-          );
+          navigator.clipboard.writeText(resetUrl);
         }
 
-        console.log(
-          "🔗 URL de reset de senha:",
-          `${window.location.origin}/auth?reset=${response.token}`,
-        );
+        console.log("🔗 URL de reset de senha:", resetUrl);
       } else {
-        toast({ title: "Email de recuperação enviado com sucesso!" });
+        toast({ title: "Instruções de recuperação enviadas!" });
       }
     },
     onError: (error: any) => {
       toast({
-        title: "Erro ao enviar email",
-        description: error.message || "Erro ao processar solicitação",
+        title: "Erro ao processar solicitação",
+        description: error.message || "Tente novamente mais tarde",
         variant: "destructive",
       });
     },

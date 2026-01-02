@@ -7,13 +7,12 @@ import { User as SelectUser } from "@shared/schema";
 import connectPg from "connect-pg-simple";
 import { pool, db } from "./db";
 import { hashPassword, comparePasswords } from "./utils";
-import { sendPasswordResetEmail } from "./sendgrid";
 import { storage } from "./storage";
 import { WebhookService } from "./services/webhook-service";
 import { discountCodes } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 import { getPaymentProvider } from "./payments";
-import { getStripeCallbacks } from "./utils/environment";
+import { getStripeCallbacks, getUrl } from "./utils/environment";
 import { findPromotionCodeByCode } from "./services/discounts/discountService";
 
 const PostgresSessionStore = connectPg(session);
@@ -922,55 +921,49 @@ export function setupAuth(app: Express) {
       });
       console.log(`✅ [RECUPERAÇÃO DE SENHA] Usuário atualizado com token`);
 
-      // Enviar email com link de recuperação
-      console.log(`🔄 [RECUPERAÇÃO DE SENHA] Enviando email para ${email}`);
-      const emailSent = await sendPasswordResetEmail(
-        email,
-        resetToken,
-        user.name || user.username,
-      );
-      console.log(
-        `${emailSent ? "✅" : "❌"} [RECUPERAÇÃO DE SENHA] Email ${emailSent ? "enviado" : "não enviado"}`,
-      );
+      // Gerar URL de recuperação usando environment manager (garante https em produção)
+      const resetUrl = getUrl(`auth?reset=${resetToken}`);
+      console.log(`🔗 [RECUPERAÇÃO DE SENHA] URL de reset: ${resetUrl}`);
 
-      // Enviar para webhook N8N em background (não bloqueia a resposta)
-      const resetUrl = `${req.protocol}://${req.get("host")}/auth?reset=${resetToken}`;
+      // Enviar para webhook N8N (único método de notificação)
+      console.log(`🔄 [RECUPERAÇÃO DE SENHA] Enviando para webhook N8N`);
       const { sendToN8NWebhook } = await import("../shared/config.js");
-      sendToN8NWebhook("passwordReset", {
-        name: user.name || user.username,
-        email: email,
-        reset_link: resetUrl,
-      })
-        .then(() =>
-          console.log("✅ Webhook N8N (resposta-usuario) enviado com sucesso"),
-        )
-        .catch((error) =>
-          console.warn("⚠️ Falha ao enviar webhook N8N:", error.message),
-        );
-
-      // Em desenvolvimento, fornecer token diretamente se email falhar
-      const response: any = {
-        message: emailSent
-          ? "Se este email estiver cadastrado, você receberá instruções de recuperação."
-          : "Email de recuperação falhou. Token de desenvolvimento fornecido abaixo.",
-        success: emailSent,
-        userName: user.name || user.username, // Incluir nome do usuário para webhook N8N
-      };
-
-      // Adicionar token em desenvolvimento quando email falha
-      if (
-        !emailSent &&
-        (process.env.NODE_ENV === "development" ||
-          !process.env.SENDGRID_API_KEY)
-      ) {
-        response.token = resetToken;
-        response.resetUrl = resetUrl;
-        console.log(
-          `🔗 [RECUPERAÇÃO DE SENHA] URL de reset para desenvolvimento: ${response.resetUrl}`,
-        );
+      
+      try {
+        await sendToN8NWebhook("passwordReset", {
+          name: user.name || user.username,
+          email: email,
+          reset_link: resetUrl,
+        });
+        console.log("✅ Webhook N8N (passwordReset) enviado com sucesso");
+        
+        res.status(200).json({
+          message: "Se este email estiver cadastrado, você receberá instruções de recuperação.",
+          success: true,
+          userName: user.name || user.username,
+        });
+      } catch (webhookError: any) {
+        console.error("❌ [RECUPERAÇÃO DE SENHA] Falha ao enviar webhook N8N:", webhookError.message);
+        
+        // Em desenvolvimento, fornecer token diretamente se webhook falhar
+        if (process.env.NODE_ENV === "development") {
+          console.log(`🔗 [RECUPERAÇÃO DE SENHA] Modo desenvolvimento - URL: ${resetUrl}`);
+          res.status(200).json({
+            message: "Webhook falhou. Token de desenvolvimento fornecido.",
+            success: false,
+            token: resetToken,
+            resetUrl: resetUrl,
+            userName: user.name || user.username,
+          });
+        } else {
+          // Em produção, retornar erro para o usuário saber que algo falhou
+          console.error("❌ [RECUPERAÇÃO DE SENHA] Falha crítica em produção - webhook não enviado");
+          res.status(500).json({
+            message: "Erro ao processar solicitação. Tente novamente mais tarde.",
+            success: false,
+          });
+        }
       }
-
-      res.status(200).json(response);
     } catch (error) {
       next(error);
     }

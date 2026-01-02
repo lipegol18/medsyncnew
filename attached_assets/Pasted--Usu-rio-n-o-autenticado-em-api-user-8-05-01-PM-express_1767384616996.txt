@@ -1,0 +1,31 @@
+❌ Usuário não autenticado em /api/user
+8:05:01 PM [express] GET /api/user 401 in 98ms
+8:05:01 PM [express] GET /api/config/support 200 in 90ms :: {"default":"5521999991905","contexts":{"…
+8:05:01 PM [express] GET /api/subscriptions/plans 200 in 136ms :: [{"id":4,"name":"VITAL","descripti…
+Notificação webhook: api_access [TESTE]
+MODO DE TESTE: Notificação não enviada para o webhook externo
+🔄 [RECUPERAÇÃO DE SENHA] Iniciando processo de recuperação de senha
+🔄 [RECUPERAÇÃO DE SENHA] Email recebido: danielroitman@gmail.com
+🔄 [RECUPERAÇÃO DE SENHA] Verificando se o email danielroitman@gmail.com existe no banco de dados
+✅ [RECUPERAÇÃO DE SENHA] Email danielroitman@gmail.com encontrado, pertence ao usuário: Daniel Roitman Pozzatti
+🔄 [RECUPERAÇÃO DE SENHA] Gerando token de recuperação
+🔄 [RECUPERAÇÃO DE SENHA] Token gerado: 23a0f6a509853cc59bf96077c20e16a5f3bb1f98 (válido até 2026-01-02T21:07:11.511Z)
+🔄 [RECUPERAÇÃO DE SENHA] Atualizando usuário com token
+✅ [RECUPERAÇÃO DE SENHA] Usuário atualizado com token
+🔗 [RECUPERAÇÃO DE SENHA] URL de reset: https://066a917b-4a6c-4696-93ce-3a79b006d860-00-4qsmp6ntacn8.riker.replit.dev/auth?reset=23a0f6a509853cc59bf96077c20e16a5f3bb1f98
+🔄 [RECUPERAÇÃO DE SENHA] Enviando para webhook N8N
+✅ Webhook N8N (passwordReset) enviado com sucesso
+8:07:15 PM [express] POST /api/forgot-password 200 in 3682ms :: {"message":"Se este email estiver ca…
+Notificação webhook: api_access [TESTE]
+MODO DE TESTE: Notificação não enviada para o webhook externo
+Notificação webhook: api_access [TESTE]
+MODO DE TESTE: Notificação não enviada para o webhook externo
+8:07:31 PM [express] GET /api/config/support 200 in 92ms :: {"default":"5521999991905","contexts":{"…
+8:07:32 PM [express] GET /api/subscriptions/plans 200 in 153ms :: [{"id":4,"name":"VITAL","descripti…
+🔐 GET /api/user - Verificando autenticação: {
+  isAuthenticated: false,
+  hasUser: false,
+  sessionID: 'Zsycpg-SWpDBFnMGPg2XxtJnChC7vNe1'
+}
+❌ Usuário não autenticado em /api/user
+8:07:34 PM [express] GET /api/user 401 in 2239ms
