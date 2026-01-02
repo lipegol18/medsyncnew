@@ -45,9 +45,9 @@ export function UnifiedExamInfo({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-testid="order-exam-info">
       {/* Indicação Clínica */}
-      <div className="mb-6 text-foreground">
+      <div className="mb-6 text-foreground" data-testid="order-clinical-indication">
         <div className="bg-card/70 border border-border rounded-md shadow-md overflow-hidden">
           {/* Título com fundo azul */}
           <div className="bg-medsync-blue px-4 py-3">
@@ -85,7 +85,7 @@ export function UnifiedExamInfo({
       />
 
       {/* Observações Adicionais */}
-      <div className="mb-6 text-foreground">
+      <div className="mb-6 text-foreground" data-testid="order-additional-notes">
         <div className="bg-card/70 border border-border rounded-md shadow-md overflow-hidden">
           {/* Título com fundo azul */}
           <div className="bg-medsync-blue px-4 py-3">

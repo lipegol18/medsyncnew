@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
 import { Header } from "@/components/layout/header";
 import { StepProgress } from "@/components/layout/step-progress";
@@ -18,6 +18,7 @@ import html2canvas from "html2canvas";
 import MedSyncLogo from "../assets/medsync-logo-new.svg";
 import DownloadIcon from "../assets/icons/MedSync_Icones_Download_Sem_Borda.svg";
 import EmailIcon from "../assets/icons/MedSync_Icones_Email_Sem_Borda.svg";
+import { useOnboarding, TourStepMetadata } from "@/features/onboarding";
 import {
   Dialog,
   DialogContent,
@@ -136,6 +137,48 @@ const steps = [
 export default function CreateOrder() {
   const [, navigate] = useLocation();
   const [currentStep, setCurrentStep] = useState(1);
+  
+  // Estado para armazenar o step inicial antes do tour começar
+  const [stepBeforeTour, setStepBeforeTour] = useState<number | null>(null);
+  const [isTourActive, setIsTourActive] = useState(false);
+  
+  // Hook para onboarding tours - sincronização com wizard
+  const { registerStepChangeListener, state: onboardingState } = useOnboarding();
+  
+  // Listener para sincronizar o wizard com o tour
+  const handleTourStepChange = useCallback((tourId: string, stepIndex: number, metadata?: TourStepMetadata) => {
+    if (tourId !== 'create-order-tour') return;
+    
+    // Se stepIndex === -1, o tour terminou ou foi cancelado
+    if (stepIndex === -1) {
+      // Restaurar o step original
+      if (stepBeforeTour !== null) {
+        setCurrentStep(stepBeforeTour);
+        setStepBeforeTour(null);
+      }
+      setIsTourActive(false);
+      return;
+    }
+    
+    // Tour começou - salvar step atual
+    if (!isTourActive && stepIndex === 0) {
+      setStepBeforeTour(currentStep);
+      setIsTourActive(true);
+    }
+    
+    // Sincronizar wizard step com o tour
+    if (metadata?.wizardStep) {
+      setCurrentStep(metadata.wizardStep);
+    }
+  }, [currentStep, stepBeforeTour, isTourActive]);
+  
+  // Registrar listener quando o componente montar
+  useEffect(() => {
+    const unsubscribe = registerStepChangeListener(handleTourStepChange);
+    return () => {
+      unsubscribe();
+    };
+  }, [registerStepChangeListener, handleTourStepChange]);
   
   // Detectar se estamos em modo de edição
   const urlParams = new URLSearchParams(window.location.search);
@@ -3670,7 +3713,7 @@ export default function CreateOrder() {
         {/* Barra horizontal sky-200 do título até breadcrumbs */}
         <div className="w-full bg-muted/30">
           <div className="container mx-auto px-4 py-6">
-            <div className="mb-6 text-center">
+            <div className="mb-6 text-center" data-testid="order-header">
               <h2 className="text-3xl font-bold text-muted-foreground">
                 Pedido Cirúrgico
               </h2>
@@ -3679,7 +3722,7 @@ export default function CreateOrder() {
               </p>
             </div>
 
-            <div className="mb-8 overflow-x-auto pb-2">
+            <div className="mb-8 overflow-x-auto pb-2" data-testid="order-steps-progress">
               <div className="relative h-16" style={{ minHeight: '4rem' }}>
                 {/* Background progress line */}
                 <div className="absolute top-3 h-2 rounded-full" 
@@ -3780,7 +3823,7 @@ export default function CreateOrder() {
         {/* Container principal com estilo do formulário de login */}
         <div className="container mx-auto px-4">
             {currentStep === 1 && (
-              <div className="p-6">
+              <div className="p-6" data-testid="order-step-1">
                 <PatientSelection
                   selectedPatient={selectedPatient}
                   setSelectedPatient={(patient) => {
@@ -3802,7 +3845,7 @@ export default function CreateOrder() {
             )}
 
             {currentStep === 2 && (
-              <div className="p-6">
+              <div className="p-6" data-testid="order-step-2">
                 <UnifiedExamInfo
                   additionalNotes={additionalNotes}
                   setAdditionalNotes={setAdditionalNotes}
@@ -3821,7 +3864,7 @@ export default function CreateOrder() {
             )}
 
             {currentStep === 3 && (
-              <div className="p-6">
+              <div className="p-6" data-testid="order-step-3">
                 <SurgeryData
                   cidCode={cidCode}
                   setCidCode={setCidCode}
@@ -3872,7 +3915,7 @@ export default function CreateOrder() {
             )}
 
             {currentStep === 4 && (
-              <div className="p-6">
+              <div className="p-6" data-testid="order-step-4">
                 <div className="mb-6 text-foreground">
                   <h3 className="text-lg font-medium text-foreground">
                     Visualização do Pedido
@@ -4475,7 +4518,7 @@ export default function CreateOrder() {
             )}
 
             {currentStep === 5 && (
-              <div className="p-6">
+              <div className="p-6" data-testid="order-step-5">
                 <div className="text-center mt-4 mb-8">
                   <Check className="w-16 h-16 text-medsync-blue mx-auto mb-4" />
                   <h3 className="text-xl font-semibold text-foreground">
@@ -4486,16 +4529,18 @@ export default function CreateOrder() {
                   </p>
                 </div>
 
-                <div className="flex justify-center gap-4 mt-6">
+                <div className="flex justify-center gap-4 mt-6" data-testid="order-pdf-actions">
                   <button
                     className="btn-medsync-dark h-10 flex items-center"
                     onClick={downloadExistingPDF}
+                    data-testid="button-download-pdf"
                   >
                     <img src={DownloadIcon} alt="Download" className="mr-2 h-5 w-5" />
                     Download
                   </button>
                   <button
                     className="btn-medsync-dark h-10 flex items-center"
+                    data-testid="button-send-email"
                     onClick={() => {
                       toast({
                         title: "Funcionalidade em desenvolvimento",
@@ -4520,7 +4565,7 @@ export default function CreateOrder() {
           
           {/* Botões de navegação */}
           {currentStep < 5 && (
-            <div className="px-6 py-4 grid grid-cols-3 items-center">
+            <div className="px-6 py-4 grid grid-cols-3 items-center" data-testid="order-navigation-buttons">
               {/* Área esquerda - Botão Voltar */}
               <div className="flex items-center">
                 {currentStep > 1 && (
@@ -4528,6 +4573,7 @@ export default function CreateOrder() {
                     onClick={goToPreviousStep}
                     className="btn-medsync-dark h-10 flex items-center"
                     disabled={isPreparingPreview || isCreatingPDF}
+                    data-testid="button-order-back"
                   >
                     <ArrowLeft className="mr-2 h-4 w-4" />
                     Voltar
@@ -4541,6 +4587,7 @@ export default function CreateOrder() {
                   onClick={saveAndExit}
                   className="btn-medsync-dark h-10 flex items-center"
                   disabled={isPreparingPreview || isCreatingPDF}
+                  data-testid="button-order-save-exit"
                 >
                   <Save className="mr-2 h-4 w-4" />
                   Salvar e Sair
@@ -4559,6 +4606,7 @@ export default function CreateOrder() {
                     (currentStep === 2 && !clinicalIndication) // Apenas indicação clínica é obrigatória no passo 2
                     // (currentStep === 3 && !selectedProcedure) // COMENTADO TEMPORARIAMENTE PARA TESTE
                   }
+                  data-testid="button-order-next"
                 >
                   {currentStep < 4 ? (
                     <>

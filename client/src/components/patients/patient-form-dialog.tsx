@@ -547,8 +547,8 @@ export function PatientFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[1200px] max-h-[95vh] w-[95vw] sm:w-full bg-white border-sky-200 text-sky-900 overflow-hidden flex flex-col">
-        <DialogHeader className="flex-shrink-0">
+      <DialogContent className="max-w-[1200px] max-h-[95vh] w-[95vw] sm:w-full bg-white border-sky-200 text-sky-900 overflow-hidden flex flex-col" data-testid="patient-form-dialog">
+        <DialogHeader className="flex-shrink-0" data-testid="patient-form-header">
           <DialogTitle className="text-foreground text-lg font-semibold">
             {isEditMode ? "Editar Paciente" : "Novo Paciente"}
           </DialogTitle>
@@ -568,7 +568,7 @@ export function PatientFormDialog({
               
               {/* Coluna Esquerda - Dados Pessoais */}
               <div className="space-y-4">
-                <Card className="bg-white border-sky-200">
+                <Card className="bg-white border-sky-200" data-testid="patient-form-personal-data">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-foreground text-sm font-semibold">
                       <User className="w-4 h-4" />
@@ -854,7 +854,7 @@ export function PatientFormDialog({
                 </Card>
 
                 {/* Plano de Saúde */}
-                <Card className="bg-white border-sky-200 flex-1 flex flex-col">
+                <Card className="bg-white border-sky-200 flex-1 flex flex-col" data-testid="patient-form-insurance">
                   <CardHeader className="p-8">
                     <CardTitle className="flex items-center gap-2 text-foreground text-sm font-semibold">
                       <Heart className="w-4 h-4" />
@@ -932,11 +932,12 @@ export function PatientFormDialog({
             </div>
 
             {/* Botões de Ação */}
-            <div className="flex justify-end space-x-2 pt-4">
+            <div className="flex justify-end space-x-2 pt-4" data-testid="patient-form-actions">
               <button
                 type="button"
                 onClick={() => onOpenChange(false)}
                 className="btn-medsync-light"
+                data-testid="button-cancel-patient"
               >
                 Cancelar
               </button>
@@ -944,6 +945,7 @@ export function PatientFormDialog({
                 type="submit" 
                 disabled={form.formState.isSubmitting}
                 className="bg-medsync-blue hover:bg-medsync-blue-dark text-white font-semibold px-4 py-2 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                data-testid="button-save-patient"
               >
                 {form.formState.isSubmitting ? "Salvando..." : (isEditMode ? "Atualizar" : "Salvar")}
               </button>

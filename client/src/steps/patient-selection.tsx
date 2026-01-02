@@ -26,7 +26,7 @@ export function PatientSelection({
   };
 
   return (
-    <div className="mb-6 text-foreground">
+    <div className="mb-6 text-foreground" data-testid="order-patient-selection">
       <div className="bg-card/70 border border-border rounded-md shadow-md overflow-hidden">
         {/* Título com fundo azul */}
         <div className="bg-medsync-blue px-4 py-3">

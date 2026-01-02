@@ -326,7 +326,7 @@ export default function Patients() {
         <div className="container mx-auto px-4 py-6 max-w-8xl">
           {/* Cabeçalho Moderno com Fundo Azul */}
           <div className="mb-8">
-            <div className="flex flex-col mb-8 p-10 rounded-xl bg-medsync-blue">
+            <div className="flex flex-col mb-8 p-10 rounded-xl bg-medsync-blue" data-testid="patients-header">
               <div className="flex items-center justify-center my-2">
                 <h1 className="text-3xl font-bold text-white text-center">
                   Gestão de Pacientes
@@ -337,7 +337,7 @@ export default function Patients() {
           
           {/* Seção de Filtros Moderna */}
           {!isLoading && !error && patients && (
-            <Card className="border-gray-200 bg-gradient-to-r from-sky-50 to-sky-100/50 shadow-sm mb-6">
+            <Card className="border-gray-200 bg-gradient-to-r from-sky-50 to-sky-100/50 shadow-sm mb-6" data-testid="patients-filters-card">
               <CardHeader className="pb-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -358,6 +358,7 @@ export default function Patients() {
                     <Button
                       onClick={handleAddNew}
                       className="bg-medsync-blue hover:bg-medsync-blue-dark text-white font-semibold"
+                      data-testid="button-novo-paciente-page"
                     >
                       <UserPlus className="mr-2 h-4 w-4" />
                       Novo Paciente

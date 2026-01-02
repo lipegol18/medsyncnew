@@ -44,6 +44,7 @@ import { ProtectedRoute } from "@/lib/protected-route";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ConsentProvider } from "@/components/consent-provider";
 import { useNavigationTracker } from "@/hooks/use-navigation-tracker";
+import { OnboardingProvider } from "@/features/onboarding";
 
 function Router() {
   // Initialize navigation tracking
@@ -107,9 +108,11 @@ function App() {
       <ThemeProvider defaultTheme="light" storageKey="medsync-theme-v2">
         <TooltipProvider>
           <AuthProvider>
-            <ConsentProvider>
-              <Router />
-            </ConsentProvider>
+            <OnboardingProvider>
+              <ConsentProvider>
+                <Router />
+              </ConsentProvider>
+            </OnboardingProvider>
           </AuthProvider>
         </TooltipProvider>
       </ThemeProvider>

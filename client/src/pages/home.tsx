@@ -10,6 +10,14 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { LgpdModal } from "@/components/ui/lgpd-modal";
+import {
+        DropdownMenu,
+        DropdownMenuContent,
+        DropdownMenuItem,
+        DropdownMenuTrigger,
+        DropdownMenuLabel,
+        DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import { t } from "@/lib/i18n";
 import { useAuth } from "@/hooks/use-auth";
 import { usePendingOrders } from "@/hooks/use-pending-orders";
@@ -34,7 +42,11 @@ import {
         Building2,
         MapPin,
         User,
+        HelpCircle,
+        BookOpen,
+        UserCircle,
 } from "lucide-react";
+import { useOnboarding } from "@/features/onboarding";
 
 import { addTranslations } from "@/lib/i18n";
 import NovoPedidoIcon from "@/assets/icons/novo-pedido-icon.svg";
@@ -387,6 +399,53 @@ export default function Home() {
                 navigate("/create-order");
         }, [navigate]);
 
+        // Hook para onboarding tours
+        const { startTour, isRunning } = useOnboarding();
+
+        // Lista de tours disponíveis
+        const availableTours = [
+                {
+                        id: 'dashboard-tour',
+                        name: 'Conhecer o Dashboard',
+                        description: 'Entenda todos os cards e botões do painel principal',
+                        icon: BarChart,
+                        path: undefined,
+                },
+                {
+                        id: 'create-order-tour',
+                        name: 'Criar Novo Pedido',
+                        description: 'Aprenda a criar um pedido cirúrgico em 5 etapas',
+                        icon: FileText,
+                        path: '/create-order',
+                },
+                {
+                        id: 'patients-tour',
+                        name: 'Cadastrar Paciente',
+                        description: 'Aprenda a cadastrar e gerenciar pacientes',
+                        icon: Users,
+                        path: '/patients',
+                },
+                {
+                        id: 'profile-tour',
+                        name: 'Editar Perfil',
+                        description: 'Aprenda a configurar seu perfil, logo e assinatura',
+                        icon: UserCircle,
+                        path: '/profile',
+                },
+        ];
+
+        const handleStartTour = (tourId: string, path?: string) => {
+                if (path) {
+                        navigate(path);
+                        // Pequeno delay para garantir que a página carregou
+                        setTimeout(() => {
+                                startTour(tourId);
+                        }, 500);
+                } else {
+                        startTour(tourId);
+                }
+        };
+
         return (
                 <div className="min-h-screen flex flex-col bg-muted">
                         <LgpdModal />
@@ -402,6 +461,46 @@ export default function Home() {
                                                                 backgroundBlendMode: 'overlay'
                                                         }}
                                                 >
+                                                        {/* Botão de Tours - Posicionado no canto superior direito */}
+                                                        {user?.roleId === 2 && (
+                                                                <div className="absolute top-4 right-4 z-10">
+                                                                        <DropdownMenu>
+                                                                                <DropdownMenuTrigger asChild>
+                                                                                        <button
+                                                                                                className="flex items-center gap-2 px-4 py-2 bg-white/90 hover:bg-white text-[#2ca8e0] rounded-lg shadow-md transition-all duration-200 font-medium"
+                                                                                                disabled={isRunning}
+                                                                                                data-testid="button-tours-menu"
+                                                                                        >
+                                                                                                <BookOpen className="h-4 w-4" />
+                                                                                                Tours de Ajuda
+                                                                                        </button>
+                                                                                </DropdownMenuTrigger>
+                                                                                <DropdownMenuContent align="end" className="w-64">
+                                                                                        <DropdownMenuLabel className="flex items-center gap-2">
+                                                                                                <HelpCircle className="h-4 w-4 text-[#2ca8e0]" />
+                                                                                                Escolha um tour
+                                                                                        </DropdownMenuLabel>
+                                                                                        <DropdownMenuSeparator />
+                                                                                        {availableTours.map((tour) => (
+                                                                                                <DropdownMenuItem
+                                                                                                        key={tour.id}
+                                                                                                        onClick={() => handleStartTour(tour.id, tour.path)}
+                                                                                                        className="flex flex-col items-start gap-1 cursor-pointer py-3"
+                                                                                                        data-testid={`tour-option-${tour.id}`}
+                                                                                                >
+                                                                                                        <div className="flex items-center gap-2 font-medium">
+                                                                                                                <tour.icon className="h-4 w-4 text-[#2ca8e0]" />
+                                                                                                                {tour.name}
+                                                                                                        </div>
+                                                                                                        <span className="text-xs text-muted-foreground pl-6">
+                                                                                                                {tour.description}
+                                                                                                        </span>
+                                                                                                </DropdownMenuItem>
+                                                                                        ))}
+                                                                                </DropdownMenuContent>
+                                                                        </DropdownMenu>
+                                                                </div>
+                                                        )}
                                                         <div className="flex flex-col p-6 lg:p-10 text-center lg:text-left">
                                                                 <h1 className="text-2xl lg:text-3xl font-bold text-white">
                                                                         Olá
@@ -461,6 +560,7 @@ export default function Home() {
                                                                 <Card 
                                                                         className="dashboard-card-interactive"
                                                                         onClick={() => navigate("/orders")}
+                                                                        data-testid="card-pedidos-cadastrados"
                                                                 >
                                                                         <CardContent className="card-content-padding">
                                                                                 <div className="flex flex-col items-center justify-center">
@@ -645,6 +745,7 @@ export default function Home() {
                                                                                                                         "/create-order")
                                                                                                         }
                                                                                                         className="btn-medsync-light flex items-center justify-center gap-2 flex-1"
+                                                                                                        data-testid="button-novo-pedido"
                                                                                                 >
                                                                                                         <PlusCircle
                                                                                                                 size={
@@ -660,6 +761,7 @@ export default function Home() {
                                                                                                                         "/patients")
                                                                                                         }
                                                                                                         className="btn-medsync-light flex items-center justify-center gap-2 flex-1"
+                                                                                                        data-testid="button-novo-paciente"
                                                                                                 >
                                                                                                         <Users
                                                                                                                 size={
@@ -674,7 +776,7 @@ export default function Home() {
                                                                 </div>
                                                                 
                                                                 {/* Card de Distribuição por Status - Coluna esquerda */}
-                                                                <Card className="dashboard-card-static">
+                                                                <Card className="dashboard-card-static" data-testid="card-distribuicao-status">
                                                         <CardHeader className="pb-3">
                                                                 <CardTitle className="flex items-center text-foreground font-semibold text-lg">
                                                                         <TrendingUp className="h-5 w-5 text-muted-foreground mr-2" />
@@ -766,7 +868,7 @@ export default function Home() {
 
                                                 {/* Coluna Direita: Agenda Cirúrgica */}
                                                 <div className="flex flex-col">
-                                                <Card className="dashboard-card-static h-full flex flex-col">
+                                                <Card className="dashboard-card-static h-full flex flex-col" data-testid="card-agenda-cirurgica">
                                                         <CardHeader className="pb-3">
                                                                 <CardTitle className="section-title">
                                                                         <Calendar className="h-5 w-5 text-muted-foreground mr-2" />

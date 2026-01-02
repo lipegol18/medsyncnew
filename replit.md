@@ -82,6 +82,30 @@ Preferred communication style: Simple, everyday language.
 
 ## Technical Notes
 
+### Onboarding Tour System
+- **Library**: React Joyride for guided tours
+- **Architecture**: Independent modular system in `client/src/features/onboarding/`
+- **Components**:
+    - `OnboardingProvider`: Context provider with Joyride integration, wraps the app
+    - `useOnboarding`: Hook for tour control (startTour, stopTour, isTourCompleted)
+    - `TourTooltip`: Custom tooltip component with MedSync styling
+    - Tours defined in `tours/` folder (e.g., `profileTour.ts`)
+- **Storage**: Completed tours persisted in localStorage (`medsync_onboarding_completed_tours`)
+- **Profile Tour Steps**: Header intro, Logo section, Signature section, CRM card section, Signature note explanation, Save button
+- **Dashboard Tour Steps**: Welcome, Total pedidos, Aguardando envio, Aguardando agendamento, Autorizados, Pendências, Aguardando recurso, Novo pedido button, Novo paciente button, Gráfico distribuição, Agenda cirúrgica
+- **Patients Tour Steps**: Header, Filtros de busca, Botão novo paciente (com explicação completa do formulário)
+- **Create Order Tour Steps** (18 total):
+  - **Wizard Step 1** (5 steps): Header, Progress bar, Seleção de paciente, Seleção de hospital, Navegação
+  - **Wizard Step 2** (2 steps): Indicação Clínica, Anexos/OCR
+  - **Wizard Step 3** (7 steps): Região Anatômica, Procedimento Cirúrgico, Lateralidade, Caráter, Campos Auto-preenchidos, Justificativa com IA, Próximos Passos
+  - **Wizard Step 4** (2 steps): Visualização do Pedido, Navegação para PDF
+  - **Wizard Step 5** (2 steps): PDF Gerado, Download e Envio
+- **Tour-Wizard Synchronization**: Tours can include `metadata.wizardStep` to control which wizard step should be active. The create-order page registers a listener that automatically switches wizard steps as the tour progresses, and restores the original step when the tour ends.
+- **Targeting**: Uses `data-testid` attributes on profile page elements for tour step targets
+- **Tour Menu Location**: Dashboard (home.tsx) - dropdown menu "Tours de Ajuda" in header banner
+- **Visibility**: Tour menu visible only for doctors (roleId === 2)
+- **Navigation**: Selecting a tour navigates to the corresponding page and starts the tour automatically
+
 ### Observation Notes System (Additional Notes)
 - **Subtitle Format**: `### [Procedimento] → [Conduta]` (human-readable, no IDs visible)
 - **Association Key**: Uses procedure name + approach name for grouping observations with their respective items

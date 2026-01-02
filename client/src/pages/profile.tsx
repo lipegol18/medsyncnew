@@ -20,7 +20,6 @@ import 'react-image-crop/dist/ReactCrop.css';
 import { useLocation } from "wouter";
 import { useNavigationTracker } from "@/hooks/use-navigation-tracker";
 import { normalizeText } from "@/lib/normalize";
-
 const Profile = () => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -1422,19 +1421,21 @@ const Profile = () => {
 
       
       {/* Header with close button */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6" data-testid="profile-header">
         <div>
           <h1 className="text-3xl font-bold text-[hsl(var(--medsync-dark-blue))]">Meu Perfil</h1>
           <p className="text-[hsl(var(--medsync-dark-blue))] mt-1">Gerencie suas informações pessoais e configurações</p>
         </div>
-        <button
-          onClick={handleClose}
-          className="btn-medsync-light flex items-center gap-2 text-sm px-3 py-1.5"
-          data-testid="button-close-profile"
-        >
-          <X className="h-4 w-4" />
-          Fechar
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleClose}
+            className="btn-medsync-light flex items-center gap-2 text-sm px-3 py-1.5"
+            data-testid="button-close-profile"
+          >
+            <X className="h-4 w-4" />
+            Fechar
+          </button>
+        </div>
       </div>
 
       <Tabs defaultValue="info" className="w-full">
@@ -1508,7 +1509,7 @@ const Profile = () => {
 
                   {/* Seção de Logo para médicos */}
                   {user.roleId === 2 && (
-                    <div className="space-y-2">
+                    <div className="space-y-2" data-testid="profile-logo-section">
                       <label className="text-sm font-medium text-[hsl(var(--medsync-dark-blue))]">Logo</label>
                       <div className="flex items-start space-x-2">
                         <ImageIcon className="text-primary w-5 h-5 mt-2" />
@@ -1602,7 +1603,7 @@ const Profile = () => {
                   
                   {/* Campo para assinatura do médico */}
                   {user.roleId === 2 && (
-                    <div className="space-y-2">
+                    <div className="space-y-2" data-testid="profile-signature-section">
                       <label className="text-sm font-medium text-[hsl(var(--medsync-dark-blue))]">Assinatura</label>
                       <div className="flex items-start space-x-2">
                         <ImageIcon className="text-primary w-5 h-5 mt-2" />
@@ -1694,7 +1695,7 @@ const Profile = () => {
                       
                       {/* Campo para nota da assinatura - apenas para médicos */}
                       {user.roleId === 2 && (
-                        <div className="space-y-2 mt-4">
+                        <div className="space-y-2 mt-4" data-testid="profile-signature-note-section">
                           <label htmlFor="signatureNote" className="text-sm font-medium text-[hsl(var(--medsync-dark-blue))]">Nota da Assinatura</label>
                           <div className="flex items-start space-x-2">
                             <PencilIcon className="text-primary w-5 h-5 mt-2" />
@@ -1798,7 +1799,7 @@ const Profile = () => {
                 
                 {/* Campo para cartão CRM do médico */}
                 {user.roleId === 2 && (
-                  <div className="space-y-2">
+                  <div className="space-y-2" data-testid="profile-crm-section">
                     <label className="text-sm font-medium text-muted-foreground">Cartão CRM</label>
                     <div className="flex items-start space-x-2">
                       <ImageIcon className="text-primary w-5 h-5 mt-2" />

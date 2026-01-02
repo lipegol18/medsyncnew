@@ -3389,7 +3389,7 @@ export function SurgeryData({
         <div className="space-y-6">
 
           {/* Seção para Seleção de Procedimentos Cirúrgicos */}
-          <div className="mb-6 text-foreground mt-6">
+          <div className="mb-6 text-foreground mt-6" data-testid="surgery-procedure-selection">
             <div className="bg-card/70 border border-border rounded-md shadow-md overflow-hidden">
               {/* Cabeçalho com fundo azul claro */}
               <div className="bg-medsync-blue px-4 py-3">
@@ -3519,7 +3519,7 @@ export function SurgeryData({
 
             {/* Lista de procedimentos selecionados com suas condutas clínicas */}
             {selectedSurgicalProcedures && selectedSurgicalProcedures.length > 0 && (
-              <div className="space-y-3">
+              <div className="space-y-3" data-testid="surgery-procedures-list">
                 <p className="text-sm text-muted-foreground mb-3">
                   Procedimentos selecionados:
                 </p>
@@ -4171,7 +4171,7 @@ export function SurgeryData({
           </div>
 
           {/* Campo de Lateralidade da Cirurgia */}
-          <div className="mb-6 text-foreground mt-6">
+          <div className="mb-6 text-foreground mt-6" data-testid="surgery-laterality">
             <div className="bg-card/70 border border-border rounded-md shadow-md overflow-hidden">
               {/* Cabeçalho com fundo azul claro */}
               <div className="bg-medsync-blue px-4 py-3">
@@ -4268,7 +4268,7 @@ export function SurgeryData({
           </div>
 
           {/* Campo de Caráter do Procedimento */}
-          <div className="mb-6 text-foreground mt-6">
+          <div className="mb-6 text-foreground mt-6" data-testid="surgery-character">
             <div className="bg-card/70 border border-border rounded-md shadow-md overflow-hidden">
               {/* Cabeçalho com fundo azul claro */}
               <div className="bg-medsync-blue px-4 py-3">
@@ -5662,7 +5662,7 @@ export function SurgeryData({
             </div>
 
             {/* Seção para Sugestão de Justificativa Clínica */}
-            <div className="mb-6 text-foreground mt-6">
+            <div className="mb-6 text-foreground mt-6" data-testid="surgery-ai-justification">
               <div className="bg-card/70 border border-border rounded-md shadow-md overflow-hidden">
                 {/* Cabeçalho com fundo azul claro */}
                 <div className="bg-medsync-blue px-4 py-3">
@@ -6181,7 +6181,7 @@ export const AnatomicalRegionSelector: React.FC<AnatomicalRegionSelectorProps> =
 
   return (
     <>
-      <div className="space-y-6">
+      <div className="space-y-6" data-testid="surgery-anatomical-region">
         {/* Grid de ícones circulares das regiões */}
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-6 place-items-center">
           {regions.map((region) => {
