@@ -910,6 +910,9 @@ export const userSubscriptions = pgTable("user_subscriptions", {
   paymentProviderSubscriptionId: text("payment_provider_subscription_id"), // ID da assinatura na plataforma
   paymentProvider: text("payment_provider").default("none"), // "stripe", "pagar_me", "mercado_pago", etc.
   
+  // Campo para rastrear início do status past_due (dunning)
+  pastDueStartedAt: timestamp("past_due_started_at"), // Data de início do status past_due
+  
   // Campos de timestamps
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -934,6 +937,7 @@ export const insertUserSubscriptionSchema = createInsertSchema(userSubscriptions
   paymentProviderCustomerId: true,
   paymentProviderSubscriptionId: true,
   paymentProvider: true,
+  pastDueStartedAt: true,
   createdAt: true,
   updatedAt: true,
 });

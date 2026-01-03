@@ -464,6 +464,27 @@ export class StripeProvider implements PaymentProvider {
     }
   }
 
+  async createBillingPortalSession(input: { customerId: string; returnUrl: string }): Promise<{ url: string }> {
+    try {
+      console.log(`🔧 [Stripe] Criando sessão do Billing Portal para customer: ${input.customerId}`);
+
+      const session = await this.stripe.billingPortal.sessions.create({
+        customer: input.customerId,
+        return_url: input.returnUrl,
+      });
+
+      console.log(`✅ [Stripe] Sessão do Billing Portal criada: ${session.url}`);
+
+      return { url: session.url };
+    } catch (error: any) {
+      console.error("❌ [Stripe] Erro ao criar sessão do Billing Portal:", error);
+      throw new PaymentError(
+        "BILLING_PORTAL_SESSION_FAILED",
+        `Falha ao criar sessão do Billing Portal: ${error.message}`,
+      );
+    }
+  }
+
   async parseWebhook(
     rawBody: Buffer,
     signature: string,

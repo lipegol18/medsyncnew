@@ -5098,54 +5098,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
   // API para obter dados de assinatura do usuário logado
+  // Usa subscription-service para auto-atualizar status de trial expirado
   app.get(
     "/api/user/subscription",
     
     async (req: Request, res: Response) => {
       try {
-        // Buscar userId do usuário autenticado na sessão
         const userId = req.user?.id;
 
         if (!userId) {
           return res.status(401).json({ message: "Usuário não autenticado" });
         }
 
-        // Buscar assinatura do usuário com JOIN para incluir dados do plano
-        const [subscriptionData] = await db
-          .select({
-            id: userSubscriptions.id,
-            userId: userSubscriptions.userId,
-            planId: userSubscriptions.planId,
-            status: userSubscriptions.status,
-            startedAt: userSubscriptions.startedAt,
-            expiresAt: userSubscriptions.expiresAt,
-            trialEndsAt: userSubscriptions.trialEndsAt,
-            paymentProviderCustomerId: userSubscriptions.paymentProviderCustomerId,
-            paymentProviderSubscriptionId: userSubscriptions.paymentProviderSubscriptionId,
-            paymentProvider: userSubscriptions.paymentProvider,
-            originalPrice: userSubscriptions.originalPrice,
-            discountPercent: userSubscriptions.discountPercent,
-            discountAmount: userSubscriptions.discountAmount,
-            finalPrice: userSubscriptions.finalPrice,
-            discountCode: userSubscriptions.discountCode,
-            discountDescription: userSubscriptions.discountDescription,
-            promotionalPrice: userSubscriptions.promotionalPrice,
-            promotionalEndsAt: userSubscriptions.promotionalEndsAt,
-            promotionalDescription: userSubscriptions.promotionalDescription,
-            createdAt: userSubscriptions.createdAt,
-            updatedAt: userSubscriptions.updatedAt,
-            plan: {
-              id: subscriptionPlans.id,
-              name: subscriptionPlans.name,
-              description: subscriptionPlans.description,
-              priceMonthly: subscriptionPlans.priceMonthly,
-              priceYearly: subscriptionPlans.priceYearly,
-            }
-          })
-          .from(userSubscriptions)
-          .leftJoin(subscriptionPlans, eq(userSubscriptions.planId, subscriptionPlans.id))
-          .where(eq(userSubscriptions.userId, userId))
-          .limit(1);
+        const { subscriptionService } = await import("./services/subscription-service");
+        const subscriptionData = await subscriptionService.getSubscriptionWithAutoUpdate(userId);
 
         if (!subscriptionData) {
           return res.status(404).json({ message: "Assinatura não encontrada" });
@@ -13902,6 +13868,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return await handlePendingPaymentFlow(session);
       }
 
+      // FLUXO DE TRIAL UPGRADE: Ativar usuário que fez upgrade do trial expirado
+      // Detectado quando existe userId e flow=trial_upgrade no metadata
+      if (metadata?.userId && metadata?.flow === 'trial_upgrade') {
+        console.log(`🔄 [TRIAL_UPGRADE] Detectado fluxo trial_upgrade para usuário ${metadata.userId}`);
+        return await handlePendingPaymentFlow(session);
+      }
+
       // FLUXO ANTIGO: Manter compatibilidade para sessões sem metadata específico
       console.log(`⚠️ Sessão não reconhecida - ignorando: ${JSON.stringify(metadata)}`);
       return true;
@@ -14347,6 +14320,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updateData.cancelledAt = new Date(canceled_at * 1000);
       }
 
+      // 5.1 Rastrear início de past_due para dunning progressivo
+      if (mappedStatus === 'past_due' && userSubscription.status !== 'past_due') {
+        // Só define pastDueStartedAt se está entrando em past_due agora
+        updateData.pastDueStartedAt = new Date();
+        console.log(`📅 pastDueStartedAt definido para usuário ${userSubscription.userId}`);
+      } else if (mappedStatus === 'active' && userSubscription.status === 'past_due') {
+        // Limpar pastDueStartedAt quando voltar para active (recuperou pagamento)
+        updateData.pastDueStartedAt = null;
+        console.log(`✅ pastDueStartedAt limpo - pagamento recuperado para usuário ${userSubscription.userId}`);
+      }
+
       // 6. Verificar mudança de plano (se price_id mudou)
       const priceId = items?.data?.[0]?.price?.id;
       if (priceId) {
@@ -14439,15 +14423,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // 3. Atualizar status da subscription se necessário
       if (paid && status === 'paid') {
-        // Se subscription estava em atraso, reativar
+        // Se subscription estava em atraso, reativar e limpar pastDueStartedAt
         if (userSubscription.status === 'past_due') {
           const updated = await storage.updateUserSubscription(userSubscription.id, {
             status: 'active',
+            pastDueStartedAt: null, // Limpar data de início do atraso
             updatedAt: new Date()
           });
           
           if (updated) {
             console.log(`🎉 Subscription reativada após pagamento para usuário ${userSubscription.userId}`);
+            console.log(`✅ pastDueStartedAt limpo - pagamento recuperado via invoice.paid`);
           }
         }
       }
@@ -14509,6 +14495,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (userSubscription.status === 'active') {
         const updated = await storage.updateUserSubscription(userSubscription.id, {
           status: 'past_due',
+          pastDueStartedAt: new Date(), // Rastrear início do período de atraso para dunning progressivo
           updatedAt: new Date()
         });
         
@@ -14769,6 +14756,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Tudo processado com sucesso
       console.log(`✅ Checkout processado com sucesso para usuário ${userRecord.id}`);
       
+      // Extrair informações adicionais do Stripe para exibição
+      let paymentMethodLast4: string | null = null;
+      let paymentMethodBrand: string | null = null;
+      let currentPeriodStart: number | null = null;
+      let currentPeriodEnd: number | null = null;
+      let billingInterval: string | null = null;
+      
+      try {
+        // Tentar obter informações da subscription do Stripe
+        if (subscription.paymentProviderSubscriptionId) {
+          const stripeSubscription = await paymentProvider.retrieveSubscription(subscription.paymentProviderSubscriptionId);
+          if (stripeSubscription) {
+            currentPeriodStart = stripeSubscription.current_period_start;
+            currentPeriodEnd = stripeSubscription.current_period_end;
+            
+            // Obter informações do método de pagamento
+            const defaultPaymentMethod = stripeSubscription.default_payment_method;
+            if (defaultPaymentMethod && typeof defaultPaymentMethod === 'object') {
+              const pm = defaultPaymentMethod as any;
+              if (pm.card) {
+                paymentMethodLast4 = pm.card.last4;
+                paymentMethodBrand = pm.card.brand;
+              }
+            }
+            
+            // Determinar billing interval
+            if (stripeSubscription.items?.data?.[0]?.price?.recurring?.interval) {
+              billingInterval = stripeSubscription.items.data[0].price.recurring.interval;
+            }
+          }
+        }
+      } catch (stripeError) {
+        console.log('⚠️ Não foi possível obter detalhes adicionais do Stripe:', stripeError);
+      }
+      
       return res.json({
         success: true,
         session: {
@@ -14780,9 +14802,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           subscription: {
             id: subscription.paymentProviderSubscriptionId,
             status: subscription.status,
-            current_period_start: null,
-            current_period_end: null
+            current_period_start: currentPeriodStart,
+            current_period_end: currentPeriodEnd
           },
+          payment_method: paymentMethodLast4 ? {
+            last4: paymentMethodLast4,
+            brand: paymentMethodBrand
+          } : null,
+          billing_interval: billingInterval,
           metadata: {
             userId: userId,
             planId: planId

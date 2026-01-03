@@ -1,23 +1,29 @@
 import { useState } from 'react';
-import { useLocation } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { CheckCircle, CreditCard, Clock, Loader2 } from 'lucide-react';
+import { CheckCircle, CreditCard, Clock, Loader2, LogOut } from 'lucide-react';
 import { type SubscriptionPlan } from '@/types/subscription';
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 import { apiRequest } from '@/lib/queryClient';
 import medSyncLogo from '@/assets/medsync-logo-new.svg';
 
+interface AutomaticDiscount {
+  data?: {
+    discountType: string;
+    discountValue: number;
+  };
+}
+
 interface TrialExpiredModalProps {
   isOpen: boolean;
   trialEndDate?: string;
   modalType?: 'trial_expired' | 'pending_payment';
+  userName?: string;
+  onLogout?: () => void;
 }
 
-export function TrialExpiredModal({ isOpen, trialEndDate, modalType = 'trial_expired' }: TrialExpiredModalProps) {
-  const [, setLocation] = useLocation();
+export function TrialExpiredModal({ isOpen, trialEndDate, modalType = 'trial_expired', userName, onLogout }: TrialExpiredModalProps) {
   const [billingInterval, setBillingInterval] = useState<'monthly' | 'yearly'>('monthly');
 
   // Buscar planos de assinatura
@@ -26,7 +32,7 @@ export function TrialExpiredModal({ isOpen, trialEndDate, modalType = 'trial_exp
   });
 
   // Buscar desconto automático ativo
-  const { data: automaticDiscountResponse } = useQuery({
+  const { data: automaticDiscountResponse } = useQuery<AutomaticDiscount>({
     queryKey: ['/api/discount-codes/automatic'],
   });
 
@@ -65,7 +71,7 @@ export function TrialExpiredModal({ isOpen, trialEndDate, modalType = 'trial_exp
   const proPlan = plans?.find(plan => plan.name === 'PRO');
 
   // Mutation para criar checkout de pagamento pendente
-  const checkoutMutation = useMutation({
+  const pendingPaymentCheckoutMutation = useMutation({
     mutationFn: async (data: { planId: number; billingInterval: string }) => {
       const response = await apiRequest<{ checkoutUrl: string; sessionId: string }>(
         '/api/subscriptions/pending-payment/checkout',
@@ -80,21 +86,45 @@ export function TrialExpiredModal({ isOpen, trialEndDate, modalType = 'trial_exp
       }
     },
     onError: (error: any) => {
-      console.error('Erro ao criar checkout:', error);
+      console.error('Erro ao criar checkout (pending_payment):', error);
     }
   });
 
+  // Mutation para criar checkout de trial expirado
+  const trialUpgradeCheckoutMutation = useMutation({
+    mutationFn: async (data: { planId: number; billingInterval: string }) => {
+      const response = await apiRequest<{ checkoutUrl: string; sessionId: string }>(
+        '/api/subscriptions/trial-upgrade/checkout',
+        'POST',
+        data
+      );
+      return response;
+    },
+    onSuccess: (data) => {
+      if (data?.checkoutUrl) {
+        window.location.href = data.checkoutUrl;
+      }
+    },
+    onError: (error: any) => {
+      console.error('Erro ao criar checkout (trial_upgrade):', error);
+    }
+  });
+
+  const isLoading = pendingPaymentCheckoutMutation.isPending || trialUpgradeCheckoutMutation.isPending;
+
   const handleUpgrade = () => {
     if (proPlan) {
+      const checkoutData = {
+        planId: proPlan.id,
+        billingInterval,
+      };
+
       if (modalType === 'pending_payment') {
-        // Para pagamento pendente, criar nova sessão de checkout
-        checkoutMutation.mutate({
-          planId: proPlan.id,
-          billingInterval,
-        });
+        // Para pagamento pendente, usar endpoint de pending-payment
+        pendingPaymentCheckoutMutation.mutate(checkoutData);
       } else {
-        // Para trial expirado, redirecionar para página de upgrade
-        setLocation(`/upgrade?plan=${proPlan.id}&billing=${billingInterval}`);
+        // Para trial expirado, usar endpoint de trial-upgrade
+        trialUpgradeCheckoutMutation.mutate(checkoutData);
       }
     }
   };
@@ -118,6 +148,11 @@ export function TrialExpiredModal({ isOpen, trialEndDate, modalType = 'trial_exp
             </div>
             {modalType === 'pending_payment' ? (
               <>
+                {userName && (
+                  <p className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-2" style={{ fontFamily: 'Nunito, sans-serif' }}>
+                    Dr(a). {userName}
+                  </p>
+                )}
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-1" style={{ fontFamily: 'Nunito, sans-serif' }}>
                   Complete seu pagamento
                 </h2>
@@ -128,6 +163,11 @@ export function TrialExpiredModal({ isOpen, trialEndDate, modalType = 'trial_exp
               </>
             ) : (
               <>
+                {userName && (
+                  <p className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-2" style={{ fontFamily: 'Nunito, sans-serif' }}>
+                    Dr(a). {userName}
+                  </p>
+                )}
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-1" style={{ fontFamily: 'Nunito, sans-serif' }}>
                   Seu período gratuito expirou
                 </h2>
@@ -291,7 +331,7 @@ export function TrialExpiredModal({ isOpen, trialEndDate, modalType = 'trial_exp
               <Button 
                 onClick={handleUpgrade}
                 size="lg"
-                disabled={checkoutMutation.isPending}
+                disabled={isLoading}
                 className="w-full text-base font-bold py-5 shadow-lg hover:shadow-xl transition-all duration-200 text-white"
                 style={{ 
                   background: 'linear-gradient(135deg, #2ca8e0 0%, #36a9e1 100%)',
@@ -299,7 +339,7 @@ export function TrialExpiredModal({ isOpen, trialEndDate, modalType = 'trial_exp
                 }}
                 data-testid="button-upgrade-now"
               >
-                {checkoutMutation.isPending ? (
+                {isLoading ? (
                   <>
                     <Loader2 className="w-5 h-5 mr-2 animate-spin" />
                     Redirecionando...
@@ -321,6 +361,20 @@ export function TrialExpiredModal({ isOpen, trialEndDate, modalType = 'trial_exp
                   Cancele a qualquer momento • Sem taxas de cancelamento
                 </p>
               </div>
+
+              {/* Opção de logout */}
+              {onLogout && (
+                <div className="text-center mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
+                  <button
+                    onClick={onLogout}
+                    className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 flex items-center justify-center gap-1 mx-auto transition-colors"
+                    data-testid="button-logout"
+                  >
+                    <LogOut className="w-3 h-3" />
+                    Sair da conta
+                  </button>
+                </div>
+              )}
             </>
           )}
         </div>

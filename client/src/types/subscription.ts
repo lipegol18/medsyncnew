@@ -18,4 +18,5 @@ export interface UserSubscription {
   status: string;
   trialEndsAt?: Date;
   paymentProvider?: string;
+  pastDueStartedAt?: Date | string | null; // Data de início do status past_due (dunning)
 }

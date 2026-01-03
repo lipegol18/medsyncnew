@@ -61,6 +61,12 @@ export interface PaymentProvider {
   cancelSubscription(subscriptionId: string): Promise<void>;
 
   /**
+   * Cria sessão do Billing Portal para gerenciamento de assinatura
+   * Permite ao usuário atualizar forma de pagamento, ver faturas, cancelar, etc.
+   */
+  createBillingPortalSession(input: { customerId: string; returnUrl: string }): Promise<{ url: string }>;
+
+  /**
    * Processa webhook events do provedor
    */
   parseWebhook(rawBody: Buffer, signature: string): Promise<WebhookEvent>;

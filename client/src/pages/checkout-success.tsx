@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { CheckCircle2, Clock, CreditCard, AlertCircle, Home } from 'lucide-react';
+import { CheckCircle2, Clock, CreditCard, AlertCircle, Home, Calendar, RefreshCw } from 'lucide-react';
 
 interface CheckoutSession {
   id: string;
@@ -18,6 +18,11 @@ interface CheckoutSession {
     current_period_start: number;
     current_period_end: number;
   };
+  payment_method?: {
+    last4: string;
+    brand: string;
+  };
+  billing_interval?: string;
   metadata?: {
     userId?: string;
     planId?: string;
@@ -57,8 +62,9 @@ export default function CheckoutSuccess() {
   const { data: successData, isLoading, error, refetch } = useQuery<SuccessPageData>({
     queryKey: [`/api/payments/checkout-success?session_id=${sessionId}`, sessionId],
     enabled: !!sessionId,
-    refetchInterval: (data) => {
+    refetchInterval: (query) => {
       // Se já processou com sucesso ou erro, parar polling
+      const data = query.state.data;
       if (data?.success === true || data?.success === false) {
         return false;
       }
@@ -76,7 +82,7 @@ export default function CheckoutSuccess() {
       queryClient.invalidateQueries({ queryKey: ['/api/user'] });
       
       toast({
-        title: "🎉 Pagamento Processado!",
+        title: "Pagamento Processado!",
         description: `Sua assinatura foi ativada com sucesso. Bem-vindo ao MedSync!`,
       });
     }
@@ -175,6 +181,33 @@ export default function CheckoutSuccess() {
   if (successData?.success && successData.user) {
     const { user, session } = successData;
     
+    // Funções auxiliares para formatação
+    const formatDate = (timestamp: number | null | undefined) => {
+      if (!timestamp) return null;
+      return new Date(timestamp * 1000).toLocaleDateString('pt-BR', {
+        day: '2-digit',
+        month: 'long',
+        year: 'numeric'
+      });
+    };
+    
+    const formatCardBrand = (brand: string | null | undefined) => {
+      if (!brand) return '';
+      const brands: Record<string, string> = {
+        'visa': 'Visa',
+        'mastercard': 'Mastercard',
+        'amex': 'American Express',
+        'elo': 'Elo',
+        'hipercard': 'Hipercard'
+      };
+      return brands[brand.toLowerCase()] || brand.charAt(0).toUpperCase() + brand.slice(1);
+    };
+    
+    const formatBillingInterval = (interval: string | null | undefined) => {
+      if (!interval) return null;
+      return interval === 'year' ? 'Anual' : 'Mensal';
+    };
+    
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <Card className="w-full max-w-lg">
@@ -183,7 +216,7 @@ export default function CheckoutSuccess() {
               <CheckCircle2 className="w-10 h-10 text-green-600" />
             </div>
             <CardTitle className="text-2xl text-green-900">
-              🎉 Pagamento Aprovado!
+              Pagamento Aprovado!
             </CardTitle>
             <CardDescription className="text-lg">
               Sua assinatura foi ativada com sucesso
@@ -203,7 +236,7 @@ export default function CheckoutSuccess() {
                 <p className="text-sm text-blue-800">
                   Plano: {user.subscription.planName}
                   <span className="ml-2 px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">
-                    {user.subscription.status}
+                    Ativo
                   </span>
                 </p>
               )}
@@ -212,15 +245,60 @@ export default function CheckoutSuccess() {
             {/* Informações da transação */}
             {session && (
               <div className="bg-gray-50 rounded-lg p-4">
-                <h4 className="font-medium text-gray-900 mb-2 flex items-center">
+                <h4 className="font-medium text-gray-900 mb-3 flex items-center">
                   <CreditCard className="w-4 h-4 mr-2" />
-                  Detalhes da Transação
+                  Detalhes da Assinatura
                 </h4>
-                <div className="text-sm text-gray-600 space-y-1">
-                  <p>ID: {session.id}</p>
-                  <p>Status: <span className="text-green-600 font-medium">{session.status}</span></p>
+                <div className="text-sm text-gray-600 space-y-2">
+                  {/* Valor e tipo de cobrança */}
                   {session.amount_total && (
-                    <p>Valor: R$ {(session.amount_total / 100).toFixed(2).replace('.', ',')}</p>
+                    <div className="flex justify-between items-center">
+                      <span>Valor cobrado:</span>
+                      <span className="font-medium text-gray-900">
+                        R$ {(session.amount_total / 100).toFixed(2).replace('.', ',')}
+                        {session.billing_interval && (
+                          <span className="text-gray-500 ml-1">
+                            ({formatBillingInterval(session.billing_interval)})
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                  )}
+                  
+                  {/* Método de pagamento */}
+                  {session.payment_method && (
+                    <div className="flex justify-between items-center">
+                      <span>Cartão:</span>
+                      <span className="font-medium text-gray-900">
+                        {formatCardBrand(session.payment_method.brand)} •••• {session.payment_method.last4}
+                      </span>
+                    </div>
+                  )}
+                  
+                  {/* Data da primeira cobrança */}
+                  {session.subscription?.current_period_start && (
+                    <div className="flex justify-between items-center">
+                      <span className="flex items-center">
+                        <Calendar className="w-3 h-3 mr-1" />
+                        Início:
+                      </span>
+                      <span className="font-medium text-gray-900">
+                        {formatDate(session.subscription.current_period_start)}
+                      </span>
+                    </div>
+                  )}
+                  
+                  {/* Próxima renovação */}
+                  {session.subscription?.current_period_end && (
+                    <div className="flex justify-between items-center">
+                      <span className="flex items-center">
+                        <RefreshCw className="w-3 h-3 mr-1" />
+                        Próxima renovação:
+                      </span>
+                      <span className="font-medium text-gray-900">
+                        {formatDate(session.subscription.current_period_end)}
+                      </span>
+                    </div>
                   )}
                 </div>
               </div>

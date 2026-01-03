@@ -55,6 +55,8 @@ import PacienteIcon from "@/assets/icons/paciente-icon.svg";
 import AvatarCroped from "@/assets/Avatar_croped.png";
 import CentroCirurgicoImage from "@/assets/banners/Medsync_1500x300px_v2.png";
 import { TrialExpiredModal } from "@/components/trial/trial-expired-modal";
+import { PastDueBanner } from "@/components/trial/past-due-banner";
+import { PastDueModal } from "@/components/trial/past-due-modal";
 import { UserSubscription } from "@/../../shared/schema";
 
 // Adicionar traduções para a página inicial
@@ -227,11 +229,17 @@ interface StatusDistribution {
 export default function Home() {
         const [_, navigate] = useLocation();
         const [labels, setLabels] = useState(translations["pt-BR"]);
-        const { user } = useAuth();
+        const { user, logoutMutation } = useAuth();
 
         // Estado para modal de pagamento/trial expirado
         const [showPaymentModal, setShowPaymentModal] = useState(false);
         const [paymentModalType, setPaymentModalType] = useState<'trial_expired' | 'pending_payment'>('trial_expired');
+
+        // Estados para past_due (pagamento em atraso)
+        const [showPastDueBanner, setShowPastDueBanner] = useState(false);
+        const [showPastDueModal, setShowPastDueModal] = useState(false);
+        const [pastDueDays, setPastDueDays] = useState(0);
+        const [isPastDueBlocking, setIsPastDueBlocking] = useState(false);
 
         // Verificar se o usuário é administrador
         const isAdmin = user?.roleId === 1;
@@ -242,26 +250,55 @@ export default function Home() {
                 enabled: !!user,
         });
 
-        // Verificar status da assinatura do usuário (trial expirado OU pagamento pendente)
+        // Verificar status da assinatura do usuário
+        // Backend já auto-atualiza trial_expired, então frontend só checa status
         useEffect(() => {
                 if (!userSubscription) return;
 
-                // Caso 1: Pagamento pendente (checkout abandonado)
+                // Mostrar modal para status que requerem ação do usuário
                 if (userSubscription.status === 'pending_payment') {
                         setPaymentModalType('pending_payment');
                         setShowPaymentModal(true);
-                        return;
-                }
-
-                // Caso 2: Trial expirado
-                if (userSubscription.status === 'trial' && userSubscription.trialEndsAt) {
-                        const now = new Date();
-                        const trialEndDate = new Date(userSubscription.trialEndsAt);
-                        
-                        if (now > trialEndDate) {
-                                setPaymentModalType('trial_expired');
-                                setShowPaymentModal(true);
+                } else if (userSubscription.status === 'trial_expired') {
+                        setPaymentModalType('trial_expired');
+                        setShowPaymentModal(true);
+                } else if (userSubscription.status === 'past_due') {
+                        // Calcular dias de atraso a partir de pastDueStartedAt
+                        let daysOverdue = 0;
+                        if (userSubscription.pastDueStartedAt) {
+                                const startDate = new Date(userSubscription.pastDueStartedAt);
+                                const now = new Date();
+                                const diffTime = Math.abs(now.getTime() - startDate.getTime());
+                                daysOverdue = Math.floor(diffTime / (1000 * 60 * 60 * 24));
                         }
+                        
+                        setPastDueDays(daysOverdue);
+                        
+                        // Nível 1: dias 0-5 -> Banner (não bloqueante)
+                        // Nível 2: dias 5-15 -> Modal (não bloqueante)
+                        // Nível 3: dias 15+ -> Modal bloqueante
+                        if (daysOverdue < 5) {
+                                // Nível 1: Banner apenas
+                                setShowPastDueBanner(true);
+                                setShowPastDueModal(false);
+                                setIsPastDueBlocking(false);
+                        } else if (daysOverdue < 15) {
+                                // Nível 2: Modal não bloqueante
+                                setShowPastDueBanner(true);
+                                setShowPastDueModal(true);
+                                setIsPastDueBlocking(false);
+                        } else {
+                                // Nível 3: Modal bloqueante
+                                setShowPastDueBanner(false);
+                                setShowPastDueModal(true);
+                                setIsPastDueBlocking(true);
+                        }
+                } else {
+                        // Limpar estados de past_due quando não estiver em atraso
+                        setShowPastDueBanner(false);
+                        setShowPastDueModal(false);
+                        setPastDueDays(0);
+                        setIsPastDueBlocking(false);
                 }
         }, [userSubscription]);
 
@@ -449,6 +486,14 @@ export default function Home() {
         return (
                 <div className="min-h-screen flex flex-col bg-muted">
                         <LgpdModal />
+
+                        {/* Banner de pagamento em atraso (past_due) - Nível 1 */}
+                        {showPastDueBanner && (
+                                <PastDueBanner 
+                                        daysOverdue={pastDueDays}
+                                        onDismiss={() => setShowPastDueBanner(false)}
+                                />
+                        )}
 
                         <main className="flex-grow bg-muted/30 overflow-visible">
                                 <div className="container mx-auto px-4 py-4 max-w-8xl overflow-visible">
@@ -1022,6 +1067,18 @@ export default function Home() {
                                 isOpen={showPaymentModal}
                                 trialEndDate={userSubscription?.trialEndsAt?.toString()}
                                 modalType={paymentModalType}
+                                userName={user?.name || user?.username}
+                                onLogout={() => logoutMutation.mutate()}
+                        />
+
+                        {/* Modal de pagamento em atraso (past_due) */}
+                        <PastDueModal
+                                isOpen={showPastDueModal}
+                                daysOverdue={pastDueDays}
+                                userName={user?.name || user?.username}
+                                isBlocking={isPastDueBlocking}
+                                onClose={() => setShowPastDueModal(false)}
+                                onLogout={() => logoutMutation.mutate()}
                         />
                 </div>
         );
