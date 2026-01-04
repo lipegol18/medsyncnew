@@ -11,3 +11,4 @@ vite.config.ts.*
 /migrations
 *.replit
 *.dump
+/attached_assets
