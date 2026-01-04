@@ -85,10 +85,11 @@ function HospitalSurgeryList({ appliedFilters }: { appliedFilters: any }) {
         params.append("hospitalId", appliedFilters.hospitalFilter);
       }
 
+      // Filtrar apenas por Cirurgia Realizada (6) e Recebido (9)
+      params.append("statusIds", "6,9");
+
       const queryString = params.toString();
-      const url = queryString
-        ? `/api/hospital-distribution-working?${queryString}`
-        : "/api/hospital-distribution-working";
+      const url = `/api/hospital-distribution-working?${queryString}`;
 
       const response = await fetch(url, {
         credentials: "include",
@@ -120,10 +121,11 @@ function HospitalSurgeryList({ appliedFilters }: { appliedFilters: any }) {
         params.append("hospitalId", appliedFilters.hospitalFilter);
       }
 
+      // Filtrar apenas por Cirurgia Realizada (6) e Recebido (9)
+      params.append("statusIds", "6,9");
+
       const queryString = params.toString();
-      const url = queryString
-        ? `/api/hospital-distribution-stats?${queryString}`
-        : "/api/hospital-distribution-stats";
+      const url = `/api/hospital-distribution-stats?${queryString}`;
 
       const response = await fetch(url, {
         credentials: "include",
@@ -208,19 +210,13 @@ function HospitalSurgeryList({ appliedFilters }: { appliedFilters: any }) {
             <div className="flex justify-between">
               <span style={{ color: 'hsl(var(--medsync-dark-blue))' }}>Cirurgias Realizadas:</span>
               <span className="font-semibold" style={{ color: 'hsl(var(--medsync-dark-blue))' }} data-testid="stat-hospital-completed">
-                {hospitalStats?.completedCount || totalSurgeries}
+                {hospitalStats?.completedCount || 0}
               </span>
             </div>
             <div className="flex justify-between">
-              <span style={{ color: 'hsl(var(--medsync-dark-blue))' }}>Pedidos Incompletos:</span>
-              <span className="font-semibold" style={{ color: 'hsl(var(--medsync-dark-blue))' }} data-testid="stat-hospital-incomplete">
-                {hospitalStats?.incompleteCount || 0}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span style={{ color: 'hsl(var(--medsync-dark-blue))' }}>Canceladas/Rejeitadas:</span>
-              <span className="font-semibold" style={{ color: 'hsl(var(--medsync-dark-blue))' }} data-testid="stat-hospital-cancelled">
-                {hospitalStats?.cancelledCount || 0}
+              <span style={{ color: 'hsl(var(--medsync-dark-blue))' }}>Recebido:</span>
+              <span className="font-semibold" style={{ color: 'hsl(var(--medsync-dark-blue))' }} data-testid="stat-hospital-received">
+                {hospitalStats?.receivedCount || 0}
               </span>
             </div>
             <div className="flex justify-between">
@@ -238,11 +234,10 @@ function HospitalSurgeryList({ appliedFilters }: { appliedFilters: any }) {
 
 // Componente para listar fornecedores por número de cirurgias
 function SupplierDistributionList({ appliedFilters }: { appliedFilters: any }) {
-  // Buscar estatísticas de fornecedores
+  // Buscar estatísticas de fornecedores (apenas status 6 e 9)
   const { data: supplierStats } = useQuery<{
     completedCount: number;
-    incompleteCount: number;
-    cancelledCount: number;
+    receivedCount: number;
     totalCount: number;
     suppliersCount: number;
   }>({
@@ -262,10 +257,11 @@ function SupplierDistributionList({ appliedFilters }: { appliedFilters: any }) {
         params.append("hospitalId", appliedFilters.hospitalFilter);
       }
 
+      // Filtrar apenas por Cirurgia Realizada (6) e Recebido (9)
+      params.append("statusIds", "6,9");
+
       const queryString = params.toString();
-      const url = queryString
-        ? `/api/supplier-distribution-stats?${queryString}`
-        : "/api/supplier-distribution-stats";
+      const url = `/api/supplier-distribution-stats?${queryString}`;
 
       const response = await fetch(url, {
         credentials: "include",
@@ -280,7 +276,7 @@ function SupplierDistributionList({ appliedFilters }: { appliedFilters: any }) {
     ...getReportsQueryConfig(),
   });
 
-  // Usar useQuery para garantir autenticação adequada
+  // Usar useQuery para garantir autenticação adequada (apenas status 6 e 9)
   const { data: supplierDistribution = [], isLoading: loading } = useQuery({
     queryKey: ["/api/supplier-distribution-working", appliedFilters],
     queryFn: async () => {
@@ -298,10 +294,11 @@ function SupplierDistributionList({ appliedFilters }: { appliedFilters: any }) {
         params.append("hospitalId", appliedFilters.hospitalFilter);
       }
 
+      // Filtrar apenas por Cirurgia Realizada (6) e Recebido (9)
+      params.append("statusIds", "6,9");
+
       const queryString = params.toString();
-      const url = queryString
-        ? `/api/supplier-distribution-working?${queryString}`
-        : "/api/supplier-distribution-working";
+      const url = `/api/supplier-distribution-working?${queryString}`;
 
       const response = await fetch(url, {
         credentials: "include",
@@ -354,15 +351,9 @@ function SupplierDistributionList({ appliedFilters }: { appliedFilters: any }) {
                 </span>
               </div>
               <div className="flex justify-between">
-                <span style={{ color: 'hsl(var(--medsync-dark-blue))' }}>Pedidos Incompletos:</span>
-                <span className="font-semibold" style={{ color: 'hsl(var(--medsync-dark-blue))' }} data-testid="stat-supplier-empty-incomplete">
-                  {supplierStats.incompleteCount}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span style={{ color: 'hsl(var(--medsync-dark-blue))' }}>Canceladas/Rejeitadas:</span>
-                <span className="font-semibold" style={{ color: 'hsl(var(--medsync-dark-blue))' }} data-testid="stat-supplier-empty-cancelled">
-                  {supplierStats.cancelledCount}
+                <span style={{ color: 'hsl(var(--medsync-dark-blue))' }}>Recebido:</span>
+                <span className="font-semibold" style={{ color: 'hsl(var(--medsync-dark-blue))' }} data-testid="stat-supplier-empty-received">
+                  {supplierStats.receivedCount}
                 </span>
               </div>
               <div className="flex justify-between">
@@ -380,6 +371,24 @@ function SupplierDistributionList({ appliedFilters }: { appliedFilters: any }) {
 
   return (
     <div className="space-y-3">
+      {/* Legenda de status */}
+      <div className="flex flex-wrap gap-2 mb-2">
+        <div className="flex items-center gap-1.5">
+          <div 
+            className="w-3 h-3 rounded-full" 
+            style={{ backgroundColor: STATUS_CONFIG.cirurgia_realizada.color }}
+          />
+          <span className="text-xs text-muted-foreground">Cirurgia Realizada</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div 
+            className="w-3 h-3 rounded-full" 
+            style={{ backgroundColor: STATUS_CONFIG.recebido.color }}
+          />
+          <span className="text-xs text-muted-foreground">Recebido</span>
+        </div>
+      </div>
+
       {supplierDistribution.map((item: any, index: number) => (
         <div
           key={index}
@@ -417,19 +426,13 @@ function SupplierDistributionList({ appliedFilters }: { appliedFilters: any }) {
           <div className="flex justify-between">
             <span style={{ color: 'hsl(var(--medsync-dark-blue))' }}>Cirurgias Realizadas:</span>
             <span className="font-semibold" style={{ color: 'hsl(var(--medsync-dark-blue))' }} data-testid="stat-supplier-completed">
-              {supplierStats?.completedCount || totalSurgeries}
+              {supplierStats?.completedCount || 0}
             </span>
           </div>
           <div className="flex justify-between">
-            <span style={{ color: 'hsl(var(--medsync-dark-blue))' }}>Pedidos Incompletos:</span>
-            <span className="font-semibold" style={{ color: 'hsl(var(--medsync-dark-blue))' }} data-testid="stat-supplier-incomplete">
-              {supplierStats?.incompleteCount || 0}
-            </span>
-          </div>
-          <div className="flex justify-between">
-            <span style={{ color: 'hsl(var(--medsync-dark-blue))' }}>Canceladas/Rejeitadas:</span>
-            <span className="font-semibold" style={{ color: 'hsl(var(--medsync-dark-blue))' }} data-testid="stat-supplier-cancelled">
-              {supplierStats?.cancelledCount || 0}
+            <span style={{ color: 'hsl(var(--medsync-dark-blue))' }}>Recebido:</span>
+            <span className="font-semibold" style={{ color: 'hsl(var(--medsync-dark-blue))' }} data-testid="stat-supplier-received">
+              {supplierStats?.receivedCount || 0}
             </span>
           </div>
           <div className="flex justify-between">
@@ -457,6 +460,35 @@ type TimeDataType = {
   weekly: TimeDataItem[];
   monthly: TimeDataItem[];
   annual: TimeDataItem[];
+};
+
+// Estrutura para dados de pedidos por status atual por mês
+type OrdersByStatusMonthlyItem = {
+  name: string;
+  incompleta: number;
+  em_analise: number;
+  autorizado: number;
+  autorizado_parcial: number;
+  pendencia: number;
+  cirurgia_realizada: number;
+  cancelada: number;
+  aguardando_envio: number;
+  recebido: number;
+  aguardando_recurso: number;
+};
+
+// Configuração de cores e labels dos status para o gráfico (cores do banco de dados order_statuses)
+const STATUS_CONFIG = {
+  aguardando_envio: { label: "Aguardando Envio", color: "#FFCC80" },    // status_id: 8
+  em_analise: { label: "Em Análise", color: "#FFF59D" },                // status_id: 2
+  autorizado: { label: "Autorizado", color: "#A5D6A7" },                // status_id: 3
+  autorizado_parcial: { label: "Autorizado Parcial", color: "#A5D6A7" },// status_id: 4
+  pendencia: { label: "Pendência", color: "#EF9A9A" },                  // status_id: 5
+  aguardando_recurso: { label: "Aguardando Recurso", color: "#EF9A9A" },// status_id: 10
+  cirurgia_realizada: { label: "Cirurgia Realizada", color: "#90CAF9" },// status_id: 6
+  recebido: { label: "Recebido", color: "#B39DDB" },                    // status_id: 9
+  cancelada: { label: "Cancelada", color: "#EEEEEE" },                  // status_id: 7
+  incompleta: { label: "Incompleta", color: "#EEEEEE" },                // status_id: 1
 };
 
 // Estado para armazenar dados reais de cirurgias eletivas vs urgência
@@ -1305,6 +1337,9 @@ export default function Reports() {
     annual: [],
   });
 
+  // Estado para armazenar dados de pedidos por status atual por mês
+  const [ordersByStatusMonthly, setOrdersByStatusMonthly] = useState<OrdersByStatusMonthlyItem[]>([]);
+
   // Estado para armazenar dados reais de cirurgias eletivas vs urgência
   const [procedureTypeData, setProcedureTypeData] = useState<
     { name: string; value: number }[]
@@ -1320,7 +1355,19 @@ export default function Reports() {
     totalCount: 0,
   });
 
-  // Estado para armazenar dados reais dos principais tipos de procedimentos
+  // Estado para armazenar dados reais dos principais tipos de procedimentos (Solicitados)
+  // Status: Aguardando Envio (1), Em Análise (2), Autorizado (3), Autorizado Parcial (4), Pendência (7), Aguardando Recurso (8), Incompleta (10)
+  const [topProceduresSolicitados, setTopProceduresSolicitados] = useState<
+    {
+      id: number;
+      name: string;
+      count: number;
+      percentage: number;
+    }[]
+  >([]);
+
+  // Estado para armazenar dados reais dos principais tipos de procedimentos (Realizados)
+  // Mantém o comportamento original (exclui canceladas e rejeitadas)
   const [topProcedures, setTopProcedures] = useState<
     {
       id: number;
@@ -1330,8 +1377,19 @@ export default function Reports() {
     }[]
   >([]);
 
-  // Estado para armazenar dados reais de cirurgias por convênio
+  // Estado para armazenar dados reais de cirurgias por convênio (Solicitadas)
+  // Status: Aguardando Envio (1), Em Análise (2), Autorizado (3), Autorizado Parcial (4), Pendência (7), Aguardando Recurso (8), Incompleta (10)
   const [insuranceDistribution, setInsuranceDistribution] = useState<
+    {
+      name: string;
+      value: number;
+      percentage: number;
+    }[]
+  >([]);
+
+  // Estado para armazenar dados reais de cirurgias por convênio (Realizadas)
+  // Status: Cirurgia Realizada (6), Recebido (9)
+  const [insuranceDistributionRealizadas, setInsuranceDistributionRealizadas] = useState<
     {
       name: string;
       value: number;
@@ -1568,6 +1626,35 @@ export default function Reports() {
         setTimeData(newTimeData);
         console.log("Dados de tempo atualizados:", newTimeData);
 
+        // Buscar dados de pedidos por status atual por mês
+        try {
+          const statusMonthlyUrl = buildFilterUrl(`/api/reports/orders-by-status-monthly`);
+          console.log("Buscando dados de pedidos por status mensal");
+          const statusMonthlyResponse = await fetch(statusMonthlyUrl);
+
+          if (statusMonthlyResponse.ok) {
+            const statusMonthlyData = await statusMonthlyResponse.json();
+
+            if (Array.isArray(statusMonthlyData)) {
+              setOrdersByStatusMonthly(statusMonthlyData);
+              console.log(
+                "Dados de pedidos por status mensal carregados:",
+                statusMonthlyData,
+              );
+            }
+          } else {
+            console.error(
+              "Erro ao buscar dados de pedidos por status mensal:",
+              statusMonthlyResponse.statusText,
+            );
+          }
+        } catch (statusMonthlyError) {
+          console.error(
+            "Erro ao processar dados de pedidos por status mensal:",
+            statusMonthlyError,
+          );
+        }
+
         // Buscar dados reais de cirurgias eletivas vs urgência com filtros
         try {
           const typeUrl = buildFilterUrl(`/api/reports/elective-vs-emergency`);
@@ -1626,56 +1713,89 @@ export default function Reports() {
           );
         }
 
-        // Buscar dados reais dos principais tipos de procedimentos com filtros
+        // Buscar dados reais dos principais tipos de procedimentos SOLICITADOS
+        // Status: Aguardando Envio (1), Em Análise (2), Autorizado (3), Autorizado Parcial (4), Pendência (7), Aguardando Recurso (8), Incompleta (10)
+        try {
+          const topProcSolicitadosUrl = buildFilterUrl(
+            `/api/reports/top-procedures?limit=5&statusIds=1,2,3,4,7,8,10`,
+          );
+          console.log("Buscando dados dos procedimentos solicitados");
+          const topProcSolicitadosResponse = await fetch(topProcSolicitadosUrl);
+
+          if (topProcSolicitadosResponse.ok) {
+            const topProcSolicitadosData = await topProcSolicitadosResponse.json();
+
+            if (Array.isArray(topProcSolicitadosData) && topProcSolicitadosData.length > 0) {
+              setTopProceduresSolicitados(topProcSolicitadosData);
+              console.log(
+                "Dados de procedimentos solicitados carregados:",
+                topProcSolicitadosData,
+              );
+            } else {
+              setTopProceduresSolicitados([]);
+              console.log("Sem dados de procedimentos solicitados");
+            }
+          } else {
+            console.error(
+              "Erro ao buscar dados de procedimentos solicitados:",
+              topProcSolicitadosResponse.statusText,
+            );
+          }
+        } catch (topProcSolicitadosError) {
+          console.error(
+            "Erro ao processar dados de procedimentos solicitados:",
+            topProcSolicitadosError,
+          );
+        }
+
+        // Buscar dados reais dos principais tipos de procedimentos REALIZADOS
+        // Status: Cirurgia Realizada (6), Recebido (9)
         try {
           const topProcUrl = buildFilterUrl(
-            `/api/reports/top-procedures?limit=5`,
+            `/api/reports/top-procedures?limit=5&statusIds=6,9`,
           );
-          console.log("Buscando dados dos principais tipos de procedimentos");
+          console.log("Buscando dados dos procedimentos realizados");
           const topProcResponse = await fetch(topProcUrl);
 
           if (topProcResponse.ok) {
             const topProcData = await topProcResponse.json();
 
             if (Array.isArray(topProcData) && topProcData.length > 0) {
-              // Atualizar dados dos principais procedimentos com valores reais
               setTopProcedures(topProcData);
               console.log(
-                "Dados de principais procedimentos carregados:",
+                "Dados de procedimentos realizados carregados:",
                 topProcData,
               );
             } else {
-              // Se não há dados, definir array vazio
               setTopProcedures([]);
-              console.log("Sem dados de principais procedimentos");
+              console.log("Sem dados de procedimentos realizados");
             }
           } else {
             console.error(
-              "Erro ao buscar dados de principais procedimentos:",
+              "Erro ao buscar dados de procedimentos realizados:",
               topProcResponse.statusText,
             );
           }
         } catch (topProcError) {
           console.error(
-            "Erro ao processar dados de principais procedimentos:",
+            "Erro ao processar dados de procedimentos realizados:",
             topProcError,
           );
         }
 
-        // Buscar dados reais de cirurgias por convênio
+        // Buscar dados reais de cirurgias por convênio (SOLICITADAS)
+        // Status: Aguardando Envio (1), Em Análise (2), Autorizado (3), Autorizado Parcial (4), Pendência (7), Aguardando Recurso (8), Incompleta (10)
         try {
           const insuranceUrl = buildFilterUrl(
-            `/api/reports/insurance-distribution`,
+            `/api/reports/insurance-distribution?statusIds=1,2,3,4,7,8,10`,
           );
-          console.log("Buscando dados de cirurgias por convênio");
+          console.log("Buscando dados de cirurgias por convênio (solicitadas)");
           const insuranceResponse = await fetch(insuranceUrl);
 
           if (insuranceResponse.ok) {
             const insuranceData = await insuranceResponse.json();
 
             if (Array.isArray(insuranceData) && insuranceData.length > 0) {
-              // Atualizar dados de convênios com valores reais
-              // Substituir nomes dos convênios por versões simplificadas
               const normalizedData = insuranceData.map((item) => {
                 let name = item.name;
                 if (name === "PORTO SEGURO - SEGURO SAÚDE S/A") {
@@ -1689,24 +1809,69 @@ export default function Reports() {
               });
               setInsuranceDistribution(normalizedData);
               console.log(
-                "Dados de cirurgias por convênio carregados:",
+                "Dados de cirurgias por convênio (solicitadas) carregados:",
                 normalizedData,
               );
             } else {
-              // Se não há dados, definir array vazio
               setInsuranceDistribution([]);
-              console.log("Sem dados de cirurgias por convênio");
+              console.log("Sem dados de cirurgias por convênio (solicitadas)");
             }
           } else {
             console.error(
-              "Erro ao buscar dados de cirurgias por convênio:",
+              "Erro ao buscar dados de cirurgias por convênio (solicitadas):",
               insuranceResponse.statusText,
             );
           }
         } catch (insuranceError) {
           console.error(
-            "Erro ao processar dados de cirurgias por convênio:",
+            "Erro ao processar dados de cirurgias por convênio (solicitadas):",
             insuranceError,
+          );
+        }
+
+        // Buscar dados reais de cirurgias por convênio (REALIZADAS)
+        // Status: Cirurgia Realizada (6), Recebido (9)
+        try {
+          const insuranceRealizadasUrl = buildFilterUrl(
+            `/api/reports/insurance-distribution?statusIds=6,9`,
+          );
+          console.log("Buscando dados de cirurgias por convênio (realizadas)");
+          const insuranceRealizadasResponse = await fetch(insuranceRealizadasUrl);
+
+          if (insuranceRealizadasResponse.ok) {
+            const insuranceRealizadasData = await insuranceRealizadasResponse.json();
+
+            if (Array.isArray(insuranceRealizadasData) && insuranceRealizadasData.length > 0) {
+              const normalizedData = insuranceRealizadasData.map((item) => {
+                let name = item.name;
+                if (name === "PORTO SEGURO - SEGURO SAÚDE S/A") {
+                  name = "PORTO SEGURO";
+                } else if (name === "ASSOCIAÇÃO PETROBRAS DE SAÚDE - APS") {
+                  name = "PETROBRAS";
+                } else if (name === "CENTRAL REGIONAL DAS COOPERATIVAS MÉDICAS - UNIMED CERRADO") {
+                  name = "UNIMED";
+                }
+                return { ...item, name };
+              });
+              setInsuranceDistributionRealizadas(normalizedData);
+              console.log(
+                "Dados de cirurgias por convênio (realizadas) carregados:",
+                normalizedData,
+              );
+            } else {
+              setInsuranceDistributionRealizadas([]);
+              console.log("Sem dados de cirurgias por convênio (realizadas)");
+            }
+          } else {
+            console.error(
+              "Erro ao buscar dados de cirurgias por convênio (realizadas):",
+              insuranceRealizadasResponse.statusText,
+            );
+          }
+        } catch (insuranceRealizadasError) {
+          console.error(
+            "Erro ao processar dados de cirurgias por convênio (realizadas):",
+            insuranceRealizadasError,
           );
         }
 
@@ -2427,122 +2592,187 @@ export default function Reports() {
                 </Popover>
               </div>
 
+              {/* Card: Pedidos Cirúrgicos Solicitados - Primeiro gráfico */}
               <Card className="border-border bg-card shadow-lg">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-card-foreground">
-                    Cirurgias por período
+                    Pedidos Cirúrgicos Solicitados
                   </CardTitle>
                   <CardDescription className="text-muted-foreground">
-                    Volume de cirurgias autorizadas, realizadas e recebidas
-                    {timeData[timeRange as keyof typeof timeData].length > 0 &&
+                    {(() => {
+                      const currentYear = new Date().getFullYear();
+                      const filterYear = appliedFilters.dateRange.startDate 
+                        ? new Date(appliedFilters.dateRange.startDate).getFullYear() 
+                        : currentYear;
+                      return `Pedidos por status atual - ${filterYear}`;
+                    })()}
+                    {ordersByStatusMonthly.length > 0 &&
                       (() => {
-                        const totalCirurgias = timeData[timeRange as keyof typeof timeData].reduce(
-                          (sum, period) =>
+                        const totalPedidos = ordersByStatusMonthly.reduce(
+                          (sum, month) =>
                             sum +
-                            period.solicitadas +
-                            period.realizadas,
+                            month.incompleta +
+                            month.em_analise +
+                            month.autorizado +
+                            month.autorizado_parcial +
+                            month.pendencia +
+                            month.cirurgia_realizada +
+                            month.cancelada +
+                            month.aguardando_envio +
+                            month.recebido +
+                            month.aguardando_recurso,
                           0,
                         );
-                        return totalCirurgias > 0
-                          ? ` • Total: ${totalCirurgias} cirurgias`
+                        return totalPedidos > 0
+                          ? ` • Total: ${totalPedidos} pedidos`
                           : "";
                       })()}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="bg-card rounded-b-lg">
-                  <div className="h-80">
+                  {/* Legenda dos status */}
+                  <div className="flex flex-wrap gap-2 mb-4 justify-center">
+                    {Object.entries(STATUS_CONFIG).map(([key, { label, color }]) => (
+                      <div key={key} className="flex items-center gap-1 text-xs">
+                        <div 
+                          className="w-3 h-3 rounded-sm" 
+                          style={{ backgroundColor: color }}
+                        />
+                        <span className="text-muted-foreground">{label}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="h-72">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={timeData[timeRange as keyof typeof timeData]}
-                        margin={{ top: 40, right: 30, left: 20, bottom: 5 }}
-                      >
-                        <CartesianGrid
-                          strokeDasharray="3 3"
-                          stroke="rgba(59, 130, 246, 0.2)"
-                        />
-                        <XAxis
-                          dataKey="name"
-                          stroke="#93c5fd"
-                          tick={{ fontSize: 11, fill: "#93c5fd" }}
-                        />
-                        <YAxis
-                          stroke="#93c5fd"
-                          tick={{ fontSize: 11, fill: "#93c5fd" }}
-                        />
-                        <Bar
-                          dataKey="solicitadas"
-                          fill="#3b82f6"
-                          name="Autorizadas"
-                          radius={[2, 2, 0, 0]}
-                        >
-                          <LabelList
-                            dataKey="solicitadas"
-                            position="top"
-                            style={{
-                              fontSize: "11px",
-                              fontWeight: "600",
-                              fill: "#3b82f6",
-                            }}
-                            formatter={(value: number) =>
-                              value > 0 ? value : ""
-                            }
-                          />
-                        </Bar>
-                        <Bar
-                          dataKey="realizadas"
-                          fill="#10b981"
-                          name="Realizadas"
-                          radius={[2, 2, 0, 0]}
-                        >
-                          <LabelList
-                            dataKey="realizadas"
-                            position="top"
-                            style={{
-                              fontSize: "11px",
-                              fontWeight: "600",
-                              fill: "#10b981",
-                            }}
-                            formatter={(value: number) =>
-                              value > 0 ? value : ""
-                            }
-                          />
-                        </Bar>
-                        <Legend
-                          iconType="rect"
-                          wrapperStyle={{ fontSize: "12px" }}
-                        />
-                      </BarChart>
+                      {(() => {
+                        const allMonths = [
+                          "Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
+                          "Jul", "Ago", "Set", "Out", "Nov", "Dez"
+                        ];
+                        
+                        const monthlyDataWithAllMonths = allMonths.map((monthName) => {
+                          const existingData = ordersByStatusMonthly.find(
+                            (m) => m.name === monthName
+                          );
+                          return existingData || {
+                            name: monthName,
+                            incompleta: 0,
+                            em_analise: 0,
+                            autorizado: 0,
+                            autorizado_parcial: 0,
+                            pendencia: 0,
+                            cirurgia_realizada: 0,
+                            cancelada: 0,
+                            aguardando_envio: 0,
+                            recebido: 0,
+                            aguardando_recurso: 0,
+                          };
+                        });
+
+                        const hasData = monthlyDataWithAllMonths.some((m) => 
+                          m.incompleta > 0 || m.em_analise > 0 || m.autorizado > 0 ||
+                          m.autorizado_parcial > 0 || m.pendencia > 0 || m.cirurgia_realizada > 0 ||
+                          m.cancelada > 0 || m.aguardando_envio > 0 || m.recebido > 0 || m.aguardando_recurso > 0
+                        );
+
+                        return hasData || ordersByStatusMonthly.length > 0 ? (
+                          <BarChart
+                            data={monthlyDataWithAllMonths}
+                            margin={{ top: 20, right: 30, left: 20, bottom: 30 }}
+                          >
+                            <CartesianGrid
+                              strokeDasharray="3 3"
+                              stroke="rgba(59, 130, 246, 0.2)"
+                            />
+                            <XAxis
+                              dataKey="name"
+                              stroke="#93c5fd"
+                              tick={{ fontSize: 11, fill: "#93c5fd" }}
+                              axisLine={false}
+                              tickLine={false}
+                            />
+                            <YAxis
+                              stroke="#93c5fd"
+                              tick={{ fontSize: 12, fill: "#93c5fd" }}
+                              axisLine={false}
+                              tickLine={false}
+                              domain={[0, "auto"]}
+                              allowDecimals={false}
+                            />
+                            <Tooltip
+                              contentStyle={{
+                                backgroundColor: "#1e3a8a",
+                                border: "1px solid #3b82f6",
+                                color: "#fff",
+                                borderRadius: "8px",
+                              }}
+                              formatter={(value: number, name: string) => {
+                                const statusKey = name as keyof typeof STATUS_CONFIG;
+                                const label = STATUS_CONFIG[statusKey]?.label || name;
+                                return [`${value} pedidos`, label];
+                              }}
+                            />
+                            <Bar dataKey="aguardando_envio" stackId="a" fill={STATUS_CONFIG.aguardando_envio.color} name="aguardando_envio" />
+                            <Bar dataKey="em_analise" stackId="a" fill={STATUS_CONFIG.em_analise.color} name="em_analise" />
+                            <Bar dataKey="autorizado" stackId="a" fill={STATUS_CONFIG.autorizado.color} name="autorizado" />
+                            <Bar dataKey="autorizado_parcial" stackId="a" fill={STATUS_CONFIG.autorizado_parcial.color} name="autorizado_parcial" />
+                            <Bar dataKey="pendencia" stackId="a" fill={STATUS_CONFIG.pendencia.color} name="pendencia" />
+                            <Bar dataKey="aguardando_recurso" stackId="a" fill={STATUS_CONFIG.aguardando_recurso.color} name="aguardando_recurso" />
+                            <Bar dataKey="cirurgia_realizada" stackId="a" fill={STATUS_CONFIG.cirurgia_realizada.color} name="cirurgia_realizada" />
+                            <Bar dataKey="recebido" stackId="a" fill={STATUS_CONFIG.recebido.color} name="recebido" />
+                            <Bar dataKey="cancelada" stackId="a" fill={STATUS_CONFIG.cancelada.color} name="cancelada" />
+                            <Bar dataKey="incompleta" stackId="a" fill={STATUS_CONFIG.incompleta.color} name="incompleta" radius={[4, 4, 0, 0]} />
+                          </BarChart>
+                        ) : (
+                          <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
+                            <BarChart4 className="w-16 h-16 mb-4 text-muted-foreground/50" />
+                            <p className="text-center">
+                              Não há dados suficientes para exibir este gráfico.
+                              <br />
+                              Crie mais solicitações de cirurgias para ver
+                              estatísticas.
+                            </p>
+                          </div>
+                        );
+                      })()}
                     </ResponsiveContainer>
                   </div>
                 </CardContent>
-                {timeData[timeRange as keyof typeof timeData].length > 0 &&
+                {ordersByStatusMonthly.length > 0 &&
                   (() => {
-                    const periodosComDados = timeData[timeRange as keyof typeof timeData].filter(
-                      (period) =>
-                        period.solicitadas > 0 ||
-                        period.realizadas > 0
+                    const currentYear = new Date().getFullYear();
+                    const filterYear = appliedFilters.dateRange.startDate 
+                      ? new Date(appliedFilters.dateRange.startDate).getFullYear() 
+                      : currentYear;
+                    
+                    const mesesComDados = ordersByStatusMonthly.filter(
+                      (month) =>
+                        month.incompleta > 0 || month.em_analise > 0 || month.autorizado > 0 ||
+                        month.autorizado_parcial > 0 || month.pendencia > 0 || month.cirurgia_realizada > 0 ||
+                        month.cancelada > 0 || month.aguardando_envio > 0 || month.recebido > 0 || month.aguardando_recurso > 0,
                     );
-                    return periodosComDados.length > 0 ? (
+                    return mesesComDados.length > 0 ? (
                       <CardFooter className="pt-4 border-t">
                         <div className="w-full">
                           <p className="text-sm font-medium text-card-foreground mb-2">
                             Resumo detalhado:
                           </p>
-                          <div className="grid grid-cols-2 gap-2 text-xs">
-                            {periodosComDados.map((period) => {
+                          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2 text-xs">
+                            {mesesComDados.map((month) => {
                               const total =
-                                period.solicitadas +
-                                period.realizadas;
+                                month.incompleta + month.em_analise + month.autorizado +
+                                month.autorizado_parcial + month.pendencia + month.cirurgia_realizada +
+                                month.cancelada + month.aguardando_envio + month.recebido + month.aguardando_recurso;
                               return (
                                 <div
-                                  key={period.name}
+                                  key={month.name}
                                   className="flex justify-between p-2 bg-muted rounded"
                                 >
                                   <span className="font-medium">
-                                    {period.name}:
+                                    {month.name}/{filterYear}:
                                   </span>
                                   <span className="text-muted-foreground">
-                                    {period.solicitadas} autorizadas / {period.realizadas} realizadas
+                                    {total} pedidos
                                   </span>
                                 </div>
                               );
@@ -2554,11 +2784,170 @@ export default function Reports() {
                   })()}
               </Card>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-                <Card className="border-border bg-card shadow-lg">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-card-foreground">
-                      Cirurgias Eletivas vs Urgência
+              {/* Card: Cirurgias Autorizadas/Realizadas */}
+              <Card className="border-border bg-card shadow-lg mt-6">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-card-foreground">
+                    Cirurgias Autorizadas/Realizadas
+                  </CardTitle>
+                  <CardDescription className="text-muted-foreground">
+                    Volume de cirurgias autorizadas e realizadas
+                    {ordersByStatusMonthly.length > 0 &&
+                      (() => {
+                        const relevantStatuses = ['autorizado', 'autorizado_parcial', 'cirurgia_realizada', 'recebido'];
+                        const totalCirurgias = ordersByStatusMonthly.reduce(
+                          (sum, month) => {
+                            const monthTotal = relevantStatuses.reduce(
+                              (s, key) => s + (month[key as keyof typeof month] as number || 0),
+                              0
+                            );
+                            return sum + monthTotal;
+                          },
+                          0,
+                        );
+                        return totalCirurgias > 0
+                          ? ` • Total: ${totalCirurgias} pedidos`
+                          : "";
+                      })()}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="bg-card rounded-b-lg">
+                  {/* Legenda apenas dos 4 status relevantes */}
+                  <div className="flex flex-wrap gap-3 mb-4 justify-center">
+                    {(['autorizado', 'autorizado_parcial', 'cirurgia_realizada', 'recebido'] as const).map((key) => (
+                      <div key={key} className="flex items-center gap-1 text-xs">
+                        <div 
+                          className="w-3 h-3 rounded-sm" 
+                          style={{ backgroundColor: STATUS_CONFIG[key].color }}
+                        />
+                        <span className="text-muted-foreground">{STATUS_CONFIG[key].label}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="h-72">
+                    <ResponsiveContainer width="100%" height="100%">
+                      {(() => {
+                        const allMonths = [
+                          "Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
+                          "Jul", "Ago", "Set", "Out", "Nov", "Dez"
+                        ];
+                        
+                        const relevantStatuses = ['autorizado', 'autorizado_parcial', 'cirurgia_realizada', 'recebido'];
+                        
+                        const monthlyDataWithAllMonths = allMonths.map((monthName) => {
+                          const existingData = ordersByStatusMonthly.find(
+                            (m) => m.name === monthName
+                          );
+                          return existingData || {
+                            name: monthName,
+                            autorizado: 0,
+                            autorizado_parcial: 0,
+                            cirurgia_realizada: 0,
+                            recebido: 0,
+                          };
+                        });
+                        
+                        const hasData = monthlyDataWithAllMonths.some(
+                          (m) =>
+                            relevantStatuses.some(
+                              (key) => (m[key as keyof typeof m] as number) > 0
+                            )
+                        );
+
+                        return hasData ? (
+                          <BarChart
+                            data={monthlyDataWithAllMonths}
+                            margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                          >
+                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(59, 130, 246, 0.2)" />
+                            <XAxis 
+                              dataKey="name" 
+                              stroke="#93c5fd" 
+                              tick={{ fontSize: 11, fill: "#93c5fd" }} 
+                            />
+                            <YAxis 
+                              stroke="#93c5fd" 
+                              tick={{ fontSize: 11, fill: "#93c5fd" }}
+                              allowDecimals={false}
+                            />
+                            <Tooltip
+                              contentStyle={{
+                                backgroundColor: "hsl(var(--card))",
+                                border: "1px solid hsl(var(--border))",
+                                borderRadius: "8px",
+                                boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+                              }}
+                              formatter={(value: number, name: string) => {
+                                const statusKey = name as keyof typeof STATUS_CONFIG;
+                                const label = STATUS_CONFIG[statusKey]?.label || name;
+                                return [`${value} pedidos`, label];
+                              }}
+                            />
+                            <Bar dataKey="autorizado" stackId="a" fill={STATUS_CONFIG.autorizado.color} name="autorizado" />
+                            <Bar dataKey="autorizado_parcial" stackId="a" fill={STATUS_CONFIG.autorizado_parcial.color} name="autorizado_parcial" />
+                            <Bar dataKey="cirurgia_realizada" stackId="a" fill={STATUS_CONFIG.cirurgia_realizada.color} name="cirurgia_realizada" />
+                            <Bar dataKey="recebido" stackId="a" fill={STATUS_CONFIG.recebido.color} name="recebido" radius={[4, 4, 0, 0]} />
+                          </BarChart>
+                        ) : (
+                          <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
+                            <BarChart4 className="w-16 h-16 mb-4 text-muted-foreground/50" />
+                            <p className="text-center">
+                              Não há dados suficientes para exibir este gráfico.
+                              <br />
+                              Crie mais solicitações para ver estatísticas.
+                            </p>
+                          </div>
+                        );
+                      })()}
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+                {ordersByStatusMonthly.length > 0 &&
+                  (() => {
+                    const relevantStatuses = ['autorizado', 'autorizado_parcial', 'cirurgia_realizada', 'recebido'] as const;
+                    const mesesComDados = ordersByStatusMonthly.filter((month) =>
+                      relevantStatuses.some(
+                        (key) => (month[key as keyof typeof month] as number) > 0
+                      )
+                    );
+                    return mesesComDados.length > 0 ? (
+                      <CardFooter className="pt-4 border-t">
+                        <div className="w-full">
+                          <p className="text-sm font-medium text-card-foreground mb-2">
+                            Resumo detalhado:
+                          </p>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                            {mesesComDados.map((month) => {
+                              const statusDetails = relevantStatuses
+                                .filter((key) => (month[key as keyof typeof month] as number) > 0)
+                                .map((key) => `${month[key as keyof typeof month]} ${STATUS_CONFIG[key].label}`)
+                                .join(" / ");
+                              return (
+                                <div
+                                  key={month.name}
+                                  className="flex justify-between p-2 bg-muted rounded gap-2"
+                                >
+                                  <span className="font-medium whitespace-nowrap">
+                                    {month.name}:
+                                  </span>
+                                  <span className="text-muted-foreground text-right">
+                                    {statusDetails}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </CardFooter>
+                    ) : null;
+                  })()}
+              </Card>
+
+              {/* Card: Cirurgias Eletivas vs Urgência */}
+              <Card className="border-border bg-card shadow-lg mt-6">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-card-foreground">
+                    Cirurgias Eletivas vs Urgência
                     </CardTitle>
                     <CardDescription className="text-muted-foreground">
                       Distribuição percentual por tipo
@@ -2603,9 +2992,10 @@ export default function Reports() {
                             contentStyle={{
                               backgroundColor: "#1e3a8a",
                               border: "1px solid #3b82f6",
-                              color: "#fff",
                               borderRadius: "8px",
                             }}
+                            labelStyle={{ color: "#fff" }}
+                            itemStyle={{ color: "#fff" }}
                             formatter={(value) => [
                               `${value} cirurgias`,
                               "Total",
@@ -2613,10 +3003,16 @@ export default function Reports() {
                           />
                           <Bar
                             dataKey="value"
-                            fill="#3B82F6"
                             radius={[4, 4, 0, 0]}
                             name="Cirurgias"
-                          />
+                          >
+                            {procedureTypeData.map((entry, index) => (
+                              <Cell 
+                                key={`cell-${index}`} 
+                                fill={entry.name === "Urgência" ? "#EF4444" : "#3B82F6"} 
+                              />
+                            ))}
+                          </Bar>
                         </BarChart>
                       ) : (
                         <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
@@ -2662,81 +3058,85 @@ export default function Reports() {
                       ) : null;
                     })()}
                 </Card>
+            </TabsContent>
 
-                {/* Novo card: Pedidos por Mês */}
+            {/* Aba de Distribuição por Tipo */}
+            <TabsContent value="distribution" className="space-y-6">
+              {/* Tipos de Procedimentos - Side by side */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Card className="border-border bg-card shadow-lg">
                   <CardHeader className="pb-2">
                     <CardTitle className="text-card-foreground">
-                      Pedidos por Mês
+                      Tipos de Procedimentos Solicitados
                     </CardTitle>
                     <CardDescription className="text-muted-foreground">
-                      Volume de pedidos cirúrgicos nos últimos 6 meses
-                      {timeData.monthly.length > 0 &&
+                      Distribuição por categoria de procedimento
+                      {topProceduresSolicitados.length > 0 &&
                         (() => {
-                          const totalPedidos = timeData.monthly.reduce(
-                            (sum, month) =>
-                              sum +
-                              month.solicitadas +
-                              month.realizadas +
-                              month.canceladas,
+                          const totalProcedures = topProceduresSolicitados.reduce(
+                            (sum, proc) => sum + proc.count,
                             0,
                           );
-                          return totalPedidos > 0
-                            ? ` • Total: ${totalPedidos} pedidos`
+                          return totalProcedures > 0
+                            ? ` • ${totalProcedures} procedimentos solicitados`
                             : "";
                         })()}
                     </CardDescription>
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      <span className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: '#BBDEFB', color: '#1565C0' }}>Aguardando Envio</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: '#FFF9C4', color: '#F9A825' }}>Em Análise</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: '#A5D6A7', color: '#2E7D32' }}>Autorizado</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: '#C8E6C9', color: '#388E3C' }}>Autorizado Parcial</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: '#FFCDD2', color: '#C62828' }}>Pendência</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: '#FFAB91', color: '#D84315' }}>Aguardando Recurso</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: '#F5F5F5', color: '#616161' }}>Incompleta</span>
+                    </div>
                   </CardHeader>
                   <CardContent className="h-80 bg-card rounded-b-lg">
                     <ResponsiveContainer width="100%" height="100%">
-                      {timeData.monthly.length > 0 ? (
+                      {topProceduresSolicitados.length > 0 ? (
                         <BarChart
-                          data={timeData.monthly.slice(-6).map((month) => ({
-                            ...month,
-                            total:
-                              month.solicitadas +
-                              month.realizadas +
-                              month.canceladas,
+                          data={topProceduresSolicitados.map((proc) => ({
+                            name: proc.name,
+                            value: proc.count,
                           }))}
-                          margin={{ top: 20, right: 30, left: 20, bottom: 30 }}
+                          layout="vertical"
+                          margin={{ top: 20, right: 30, left: 100, bottom: 20 }}
                         >
                           <CartesianGrid
                             strokeDasharray="3 3"
                             stroke="rgba(59, 130, 246, 0.2)"
                           />
-                          <XAxis
-                            dataKey="name"
-                            stroke="#93c5fd"
-                            tick={{ fontSize: 12, fill: "#93c5fd" }}
-                            axisLine={false}
-                            tickLine={false}
-                          />
+                          <XAxis type="number" stroke="#93c5fd" />
                           <YAxis
-                            stroke="#93c5fd"
+                            type="category"
+                            dataKey="name"
                             tick={{ fontSize: 12, fill: "#93c5fd" }}
-                            axisLine={false}
-                            tickLine={false}
-                            domain={[0, "dataMax + 2"]}
+                            width={100}
+                            stroke="#93c5fd"
                           />
                           <Tooltip
                             contentStyle={{
                               backgroundColor: "#1e3a8a",
                               border: "1px solid #3b82f6",
                               color: "#fff",
-                              borderRadius: "8px",
                             }}
-                            formatter={(value) => [`${value} pedidos`, "Total"]}
+                            labelStyle={{ color: "#fff" }}
+                            itemStyle={{ color: "#fff" }}
+                            formatter={(value) => [
+                              `${value} cirurgias`,
+                              "Quantidade",
+                            ]}
                           />
                           <Bar
-                            dataKey="total"
-                            fill="#3B82F6"
-                            radius={[4, 4, 0, 0]}
-                            name="Total de Pedidos"
+                            dataKey="value"
+                            fill="#3b82f6"
+                            radius={[0, 4, 4, 0]}
                           />
                         </BarChart>
                       ) : (
                         <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
-                          <BarChart4 className="w-16 h-16 mb-4 text-muted-foreground/50" />
+                          <AlertCircle className="w-16 h-16 mb-4 text-muted-foreground/50" />
                           <p className="text-center">
                             Não há dados suficientes para exibir este gráfico.
                             <br />
@@ -2747,56 +3147,35 @@ export default function Reports() {
                       )}
                     </ResponsiveContainer>
                   </CardContent>
-                  {timeData.monthly.length > 0 &&
+                  {topProceduresSolicitados.length > 0 &&
                     (() => {
-                      const mesesComDados = timeData.monthly.filter(
-                        (month) =>
-                          month.solicitadas > 0 ||
-                          month.realizadas > 0 ||
-                          month.canceladas > 0,
+                      const totalProcedures = topProceduresSolicitados.reduce(
+                        (sum, proc) => sum + proc.count,
+                        0,
                       );
-                      return mesesComDados.length > 0 ? (
+                      return totalProcedures > 0 ? (
                         <CardFooter className="pt-4 border-t">
                           <div className="w-full">
                             <p className="text-sm font-medium text-card-foreground mb-2">
                               Resumo detalhado:
                             </p>
-                            <div className="grid grid-cols-2 gap-2 text-xs">
-                              {mesesComDados.map((month) => {
-                                const total =
-                                  month.solicitadas +
-                                  month.realizadas +
-                                  month.canceladas;
-                                return (
-                                  <div
-                                    key={month.name}
-                                    className="flex justify-between p-2 bg-muted rounded"
-                                  >
-                                    <span className="font-medium">
-                                      {month.name}/2025:
-                                    </span>
-                                    <span className="text-muted-foreground">
-                                      {total} pedidos
-                                    </span>
-                                  </div>
-                                );
-                              })}
+                            <div className="space-y-2 text-xs">
+                              <div className="flex justify-between p-2 bg-primary/10 rounded font-medium">
+                                <span>Total de procedimentos:</span>
+                                <span>{totalProcedures} cirurgias</span>
+                              </div>
                             </div>
                           </div>
                         </CardFooter>
                       ) : null;
                     })()}
                 </Card>
-              </div>
-            </TabsContent>
 
-            {/* Aba de Distribuição por Tipo */}
-            <TabsContent value="distribution" className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Tipos de Procedimentos Realizados */}
                 <Card className="border-border bg-card shadow-lg">
                   <CardHeader className="pb-2">
                     <CardTitle className="text-card-foreground">
-                      Principais Tipos de Procedimentos
+                      Tipos de Procedimentos Realizados
                     </CardTitle>
                     <CardDescription className="text-muted-foreground">
                       Distribuição por categoria de procedimento
@@ -2806,12 +3185,15 @@ export default function Reports() {
                             (sum, proc) => sum + proc.count,
                             0,
                           );
-                          const totalOrders = summaryStats.orderCount || 0;
                           return totalProcedures > 0
-                            ? ` • ${totalProcedures} de ${totalOrders} cirurgias têm procedimentos definidos`
+                            ? ` • ${totalProcedures} procedimentos realizados`
                             : "";
                         })()}
                     </CardDescription>
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      <span className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: '#81C784', color: '#1B5E20' }}>Cirurgia Realizada</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: '#B39DDB', color: '#4527A0' }}>Recebido</span>
+                    </div>
                   </CardHeader>
                   <CardContent className="h-80 bg-card rounded-b-lg">
                     <ResponsiveContainer width="100%" height="100%">
@@ -2842,6 +3224,8 @@ export default function Reports() {
                               border: "1px solid #3b82f6",
                               color: "#fff",
                             }}
+                            labelStyle={{ color: "#fff" }}
+                            itemStyle={{ color: "#fff" }}
                             formatter={(value) => [
                               `${value} cirurgias`,
                               "Quantidade",
@@ -2872,11 +3256,6 @@ export default function Reports() {
                         (sum, proc) => sum + proc.count,
                         0,
                       );
-                      const totalOrders = summaryStats.orderCount || 0;
-                      const withoutProcedures = Math.max(
-                        0,
-                        totalOrders - totalProcedures,
-                      );
                       return totalProcedures > 0 ? (
                         <CardFooter className="pt-4 border-t">
                           <div className="w-full">
@@ -2885,16 +3264,8 @@ export default function Reports() {
                             </p>
                             <div className="space-y-2 text-xs">
                               <div className="flex justify-between p-2 bg-primary/10 rounded font-medium">
-                                <span>Com procedimentos:</span>
+                                <span>Total de procedimentos:</span>
                                 <span>{totalProcedures} cirurgias</span>
-                              </div>
-                              <div className="flex justify-between p-2 bg-muted rounded text-muted-foreground">
-                                <span>Sem procedimentos:</span>
-                                <span>{withoutProcedures} cirurgias</span>
-                              </div>
-                              <div className="flex justify-between p-2 bg-accent rounded font-medium">
-                                <span>Total geral:</span>
-                                <span>{totalOrders} cirurgias</span>
                               </div>
                             </div>
                           </div>
@@ -2902,11 +3273,15 @@ export default function Reports() {
                       ) : null;
                     })()}
                 </Card>
+              </div>
 
+              {/* Cirurgias por Convênio - Grid com 2 colunas */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Cirurgias Solicitadas por Convênio */}
                 <Card className="border-border bg-card shadow-lg">
                   <CardHeader className="pb-2">
                     <CardTitle className="text-card-foreground">
-                      Cirurgias por Convênio
+                      Cirurgias Solicitadas por Convênio
                     </CardTitle>
                     <CardDescription className="text-muted-foreground">
                       Distribuição por operadora de saúde
@@ -2917,10 +3292,19 @@ export default function Reports() {
                             0,
                           );
                           return totalInsurance > 0
-                            ? ` • ${totalInsurance} cirurgias com convênio definido`
+                            ? ` • ${totalInsurance} cirurgias solicitadas`
                             : "";
                         })()}
                     </CardDescription>
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      <span className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: '#BBDEFB', color: '#1565C0' }}>Aguardando Envio</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: '#FFF9C4', color: '#F9A825' }}>Em Análise</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: '#A5D6A7', color: '#2E7D32' }}>Autorizado</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: '#C8E6C9', color: '#388E3C' }}>Autorizado Parcial</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: '#FFCDD2', color: '#C62828' }}>Pendência</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: '#FFAB91', color: '#D84315' }}>Aguardando Recurso</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: '#F5F5F5', color: '#616161' }}>Incompleta</span>
+                    </div>
                   </CardHeader>
                   <CardContent className="h-80 bg-card rounded-b-lg">
                     <ResponsiveContainer width="100%" height="100%">
@@ -2951,6 +3335,8 @@ export default function Reports() {
                               border: "1px solid #3b82f6",
                               color: "#fff",
                             }}
+                            labelStyle={{ color: "#fff" }}
+                            itemStyle={{ color: "#fff" }}
                             formatter={(value) => [
                               `${value} cirurgias`,
                               "Quantidade",
@@ -3004,38 +3390,150 @@ export default function Reports() {
                       ) : null;
                     })()}
                 </Card>
-              </div>
 
-              {/* Segunda linha - Cards adicionais de Distribuição */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                {/* Cirurgias Realizadas por Convênio */}
                 <Card className="border-border bg-card shadow-lg">
                   <CardHeader className="pb-2">
                     <CardTitle className="text-card-foreground">
-                      Cirurgias por Hospital
+                      Cirurgias Realizadas por Convênio
                     </CardTitle>
                     <CardDescription className="text-muted-foreground">
-                      Quantidade de cirurgias realizadas por hospital
+                      Distribuição por operadora de saúde
+                      {insuranceDistributionRealizadas.length > 0 &&
+                        (() => {
+                          const totalInsurance = insuranceDistributionRealizadas.reduce(
+                            (sum, ins) => sum + ins.value,
+                            0,
+                          );
+                          return totalInsurance > 0
+                            ? ` • ${totalInsurance} cirurgias realizadas`
+                            : "";
+                        })()}
                     </CardDescription>
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      <span className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: '#81C784', color: '#1B5E20' }}>Cirurgia Realizada</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: '#B39DDB', color: '#4527A0' }}>Recebido</span>
+                    </div>
                   </CardHeader>
-                  <CardContent className="bg-card rounded-b-lg">
-                    <HospitalSurgeryList appliedFilters={appliedFilters} />
+                  <CardContent className="h-80 bg-card rounded-b-lg">
+                    <ResponsiveContainer width="100%" height="100%">
+                      {insuranceDistributionRealizadas.length > 0 ? (
+                        <BarChart
+                          data={insuranceDistributionRealizadas.map((ins) => ({
+                            name: ins.name,
+                            value: ins.value,
+                          }))}
+                          layout="vertical"
+                          margin={{ top: 20, right: 30, left: 120, bottom: 20 }}
+                        >
+                          <CartesianGrid
+                            strokeDasharray="3 3"
+                            stroke="rgba(59, 130, 246, 0.2)"
+                          />
+                          <XAxis type="number" stroke="#93c5fd" />
+                          <YAxis
+                            type="category"
+                            dataKey="name"
+                            tick={{ fontSize: 12, fill: "#93c5fd" }}
+                            width={120}
+                            stroke="#93c5fd"
+                          />
+                          <Tooltip
+                            contentStyle={{
+                              backgroundColor: "#1e3a8a",
+                              border: "1px solid #3b82f6",
+                              color: "#fff",
+                            }}
+                            labelStyle={{ color: "#fff" }}
+                            itemStyle={{ color: "#fff" }}
+                            formatter={(value) => [
+                              `${value} cirurgias`,
+                              "Quantidade",
+                            ]}
+                          />
+                          <Bar
+                            dataKey="value"
+                            fill="#22c55e"
+                            radius={[0, 4, 4, 0]}
+                          />
+                        </BarChart>
+                      ) : (
+                        <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
+                          <AlertCircle className="w-16 h-16 mb-4 text-muted-foreground/50" />
+                          <p className="text-center">
+                            Não há dados suficientes para exibir este gráfico.
+                            <br />
+                            Crie mais solicitações de cirurgias para ver
+                            estatísticas.
+                          </p>
+                        </div>
+                      )}
+                    </ResponsiveContainer>
                   </CardContent>
-                </Card>
-
-                <Card className="border-border bg-card shadow-lg">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-card-foreground">
-                      Fornecedores por Cirurgias
-                    </CardTitle>
-                    <CardDescription className="text-muted-foreground">
-                      Fornecedores mais utilizados nos procedimentos OPME
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="bg-card rounded-b-lg">
-                    <SupplierDistributionList appliedFilters={appliedFilters} />
-                  </CardContent>
+                  {insuranceDistributionRealizadas.length > 0 &&
+                    (() => {
+                      const totalInsurance = insuranceDistributionRealizadas.reduce(
+                        (sum, ins) => sum + ins.value,
+                        0,
+                      );
+                      return totalInsurance > 0 ? (
+                        <CardFooter className="pt-4 border-t">
+                          <div className="w-full">
+                            <p className="text-sm font-medium text-card-foreground mb-2">
+                              Resumo detalhado:
+                            </p>
+                            <div className="space-y-2 text-xs">
+                              <div className="flex justify-between p-2 bg-primary/10 rounded font-medium">
+                                <span>Total de cirurgias:</span>
+                                <span>{totalInsurance} cirurgias</span>
+                              </div>
+                              <div className="flex justify-between p-2 bg-accent rounded font-medium">
+                                <span>Convênios cadastrados:</span>
+                                <span>
+                                  {insuranceDistributionRealizadas.length} operadoras
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </CardFooter>
+                      ) : null;
+                    })()}
                 </Card>
               </div>
+
+              {/* Cirurgias por Hospital - Linha separada */}
+              <Card className="border-border bg-card shadow-lg mt-6">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-card-foreground">
+                    Cirurgias por Hospital
+                  </CardTitle>
+                  <CardDescription className="text-muted-foreground">
+                    Quantidade de cirurgias realizadas por hospital
+                  </CardDescription>
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    <span className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: '#81C784', color: '#1B5E20' }}>Cirurgia Realizada</span>
+                    <span className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: '#B39DDB', color: '#4527A0' }}>Recebido</span>
+                  </div>
+                </CardHeader>
+                <CardContent className="bg-card rounded-b-lg">
+                  <HospitalSurgeryList appliedFilters={appliedFilters} />
+                </CardContent>
+              </Card>
+
+              {/* Fornecedores por Cirurgias - Linha separada */}
+              <Card className="border-border bg-card shadow-lg mt-6">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-card-foreground">
+                    Fornecedores por Cirurgias
+                  </CardTitle>
+                  <CardDescription className="text-muted-foreground">
+                    Fornecedores mais utilizados nos procedimentos OPME
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="bg-card rounded-b-lg">
+                  <SupplierDistributionList appliedFilters={appliedFilters} />
+                </CardContent>
+              </Card>
             </TabsContent>
 
             {/* Aba de Valores Recebidos */}

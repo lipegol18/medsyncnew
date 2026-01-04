@@ -1612,14 +1612,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const userId = req.user?.id || 83;
         const isAdmin = req.user?.roleId === 1;
         
-        // Extrair filtros de data
+        // Extrair filtros de data e status
         const startDate = req.query.startDate as string;
         const endDate = req.query.endDate as string;
+        const statusIds = req.query.statusIds as string;
         
-        console.log(`Buscando distribuição de cirurgias por convênio - usuário ${userId}, isAdmin: ${isAdmin}, filtros: ${startDate} a ${endDate}`);
+        console.log(`Buscando distribuição de cirurgias por convênio - usuário ${userId}, isAdmin: ${isAdmin}, filtros: ${startDate} a ${endDate}, statusIds: ${statusIds}`);
         
         // Construir condições WHERE dinamicamente
-        let whereConditions = ['mo.status_id NOT IN (5, 7)'];  // Excluir canceladas e rejeitadas
+        let whereConditions: string[] = [];
+        
+        // Se statusIds fornecidos, usar eles; senão excluir canceladas e rejeitadas
+        if (statusIds) {
+          const statusIdList = statusIds.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+          if (statusIdList.length > 0) {
+            whereConditions.push(`mo.status_id IN (${statusIdList.join(',')})`);
+          }
+        } else {
+          whereConditions.push('mo.status_id NOT IN (5, 7)');  // Excluir canceladas e rejeitadas
+        }
         let params = [];
         let paramIndex = 1;
         
@@ -1728,11 +1739,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Extrair filtros de data
         const startDate = req.query.startDate as string;
         const endDate = req.query.endDate as string;
+        const statusIds = req.query.statusIds as string; // Comma-separated status IDs
         
-        console.log(`Buscando principais procedimentos cirúrgicos - usuário ${userId}, isAdmin: ${isAdmin}, limit: ${limit}, filtros: ${startDate} a ${endDate}`);
+        console.log(`Buscando principais procedimentos cirúrgicos - usuário ${userId}, isAdmin: ${isAdmin}, limit: ${limit}, filtros: ${startDate} a ${endDate}, statusIds: ${statusIds}`);
         
         // Construir condições WHERE dinamicamente
-        let whereConditions = ['mo.status_id NOT IN (5, 7)'];  // Excluir canceladas e rejeitadas
+        let whereConditions: string[] = [];
+        
+        // Se statusIds for fornecido, filtrar por esses status específicos
+        if (statusIds) {
+          const statusArray = statusIds.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+          if (statusArray.length > 0) {
+            whereConditions.push(`mo.status_id IN (${statusArray.join(',')})`);
+          }
+        } else {
+          // Comportamento padrão: excluir canceladas e rejeitadas
+          whereConditions.push('mo.status_id NOT IN (5, 7)');
+        }
         let params = [];
         let paramIndex = 1;
         
@@ -1919,7 +1942,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`Buscando estatísticas de cirurgias eletivas vs urgência - usuário ${userId}, isAdmin: ${isAdmin}, filtros: ${startDate} a ${endDate}`);
         
         // Construir condições WHERE dinamicamente
-        let whereConditions = ['status_id NOT IN (5, 7)'];  // Excluir canceladas e rejeitadas
+        // Filtrar apenas: Autorizado (3), Autorizado Parcial (4), Cirurgia Realizada (6), Recebido (9)
+        let whereConditions = ['status_id IN (3, 4, 6, 9)'];
         let params = [];
         let paramIndex = 1;
         
@@ -2230,6 +2254,117 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error(`Erro ao processar requisição de volume de cirurgias:`, error);
         res.status(500).json({ 
           message: "Erro ao obter dados de volume de cirurgias", 
+          error: error.message 
+        });
+      }
+    }
+  );
+
+  // API para obter pedidos agrupados por status atual por mês
+  app.get(
+    "/api/reports/orders-by-status-monthly",
+    reportAuth,
+    async (req: Request, res: Response) => {
+      try {
+        const userId = req.user?.id;
+        const isAdmin = req.user?.roleId === 1;
+        
+        // Extrair filtros de data
+        const startDate = req.query.startDate as string;
+        const endDate = req.query.endDate as string;
+        
+        console.log(`Buscando pedidos por status mensal - usuário ${userId}, isAdmin: ${isAdmin}, filtros: ${startDate} a ${endDate}`);
+        
+        const currentYear = new Date().getFullYear();
+        
+        // Construir condições WHERE dinamicamente
+        let whereConditions: string[] = [];
+        let params: any[] = [];
+        let paramIndex = 1;
+        
+        if (startDate && endDate) {
+          whereConditions.push(`mo.created_at >= $${paramIndex} AND mo.created_at < $${paramIndex + 1}::date + interval '1 day'`);
+          params.push(startDate, endDate);
+          paramIndex += 2;
+        } else {
+          whereConditions.push(`EXTRACT(YEAR FROM mo.created_at) = ${currentYear}`);
+        }
+        
+        if (!isAdmin) {
+          whereConditions.push(`mo.user_id = $${paramIndex}`);
+          params.push(userId);
+          paramIndex++;
+        }
+        
+        const whereClause = whereConditions.length > 0 ? whereConditions.join(' AND ') : '1=1';
+        
+        const query = `
+        WITH all_months AS (
+          SELECT 
+            generate_series(1, 12) as month_num,
+            to_char(make_date(${currentYear}, generate_series(1, 12), 1), 'Mon') as month_name
+        ),
+        monthly_status_data AS (
+          SELECT 
+            EXTRACT(MONTH FROM mo.created_at) as month_num,
+            mo.status_id,
+            os.name as status_name,
+            os.color as status_color,
+            count(*) as count
+          FROM medical_orders mo
+          LEFT JOIN order_statuses os ON mo.status_id = os.id
+          WHERE ${whereClause}
+          GROUP BY month_num, mo.status_id, os.name, os.color
+        )
+        SELECT 
+          am.month_name as name,
+          am.month_num,
+          COALESCE(SUM(CASE WHEN msd.status_id = 1 THEN msd.count ELSE 0 END), 0) as "incompleta",
+          COALESCE(SUM(CASE WHEN msd.status_id = 2 THEN msd.count ELSE 0 END), 0) as "em_analise",
+          COALESCE(SUM(CASE WHEN msd.status_id = 3 THEN msd.count ELSE 0 END), 0) as "autorizado",
+          COALESCE(SUM(CASE WHEN msd.status_id = 4 THEN msd.count ELSE 0 END), 0) as "autorizado_parcial",
+          COALESCE(SUM(CASE WHEN msd.status_id = 5 THEN msd.count ELSE 0 END), 0) as "pendencia",
+          COALESCE(SUM(CASE WHEN msd.status_id = 6 THEN msd.count ELSE 0 END), 0) as "cirurgia_realizada",
+          COALESCE(SUM(CASE WHEN msd.status_id = 7 THEN msd.count ELSE 0 END), 0) as "cancelada",
+          COALESCE(SUM(CASE WHEN msd.status_id = 8 THEN msd.count ELSE 0 END), 0) as "aguardando_envio",
+          COALESCE(SUM(CASE WHEN msd.status_id = 9 THEN msd.count ELSE 0 END), 0) as "recebido",
+          COALESCE(SUM(CASE WHEN msd.status_id = 10 THEN msd.count ELSE 0 END), 0) as "aguardando_recurso"
+        FROM all_months am
+        LEFT JOIN monthly_status_data msd ON am.month_num = msd.month_num
+        GROUP BY am.month_name, am.month_num
+        ORDER BY am.month_num
+        `;
+        
+        const queryResult = await pool.query(query, params);
+        
+        // Tradução dos meses para português
+        const monthMap: Record<string, string> = {
+          'Jan': 'Jan', 'Feb': 'Fev', 'Mar': 'Mar', 'Apr': 'Abr',
+          'May': 'Mai', 'Jun': 'Jun', 'Jul': 'Jul', 'Aug': 'Ago',
+          'Sep': 'Set', 'Oct': 'Out', 'Nov': 'Nov', 'Dec': 'Dez'
+        };
+        
+        const result = queryResult.rows.map(row => ({
+          name: monthMap[row.name] || row.name,
+          incompleta: Number(row.incompleta) || 0,
+          em_analise: Number(row.em_analise) || 0,
+          autorizado: Number(row.autorizado) || 0,
+          autorizado_parcial: Number(row.autorizado_parcial) || 0,
+          pendencia: Number(row.pendencia) || 0,
+          cirurgia_realizada: Number(row.cirurgia_realizada) || 0,
+          cancelada: Number(row.cancelada) || 0,
+          aguardando_envio: Number(row.aguardando_envio) || 0,
+          recebido: Number(row.recebido) || 0,
+          aguardando_recurso: Number(row.aguardando_recurso) || 0
+        }));
+        
+        console.log('Dados de pedidos por status mensal:', result);
+        res.json(result);
+        
+      } catch (error: any) {
+        console.error(`Erro ao processar requisição de pedidos por status mensal:`, error);
+        res.status(500).json({ 
+          message: "Erro ao obter dados de pedidos por status mensal", 
           error: error.message 
         });
       }
@@ -3795,10 +3930,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const endDate = req.query.endDate as string;
       const statusFilter = req.query.status as string;
       const hospitalIdFilter = req.query.hospitalId as string;
+      const statusIds = req.query.statusIds as string;
       
       console.log(`=== HOSPITAL-DISTRIBUTION-WORKING - CIRURGIAS POR HOSPITAL ===`);
       console.log(`Usuário ID: ${userId}, É Admin: ${isAdmin}`);
-      console.log(`Filtros aplicados:`, { startDate, endDate, statusFilter, hospitalIdFilter });
+      console.log(`Filtros aplicados:`, { startDate, endDate, statusFilter, hospitalIdFilter, statusIds });
       
       // Se não há usuário autenticado, retornar array vazio
       if (!userId) {
@@ -3810,8 +3946,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let params: any[] = [];
       let whereConditions: string[] = [];
       
-      // Condição base: excluir pedidos incompletos e cancelados
-      whereConditions.push("mo.status_id NOT IN (1, 5, 7)");
+      // Se statusIds fornecidos, usar eles; senão usar filtro padrão
+      if (statusIds) {
+        const statusIdList = statusIds.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+        if (statusIdList.length > 0) {
+          whereConditions.push(`mo.status_id IN (${statusIdList.join(',')})`);
+        }
+      } else {
+        // Condição base: excluir pedidos incompletos e cancelados
+        whereConditions.push("mo.status_id NOT IN (1, 5, 7)");
+      }
       
       if (isAdmin) {
         // Admin pode ver todas as cirurgias, mas ainda aplicamos filtros específicos
@@ -3886,16 +4030,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const isAdmin = req.user?.roleId === 1;
       
       if (!userId) {
-        return res.json({ completedCount: 0, incompleteCount: 0, cancelledCount: 0, totalCount: 0 });
+        return res.json({ completedCount: 0, receivedCount: 0, totalCount: 0 });
       }
       
       // Extrair filtros da query string
       const startDate = req.query.startDate as string;
       const endDate = req.query.endDate as string;
       const hospitalIdFilter = req.query.hospitalId as string;
+      const statusIds = req.query.statusIds as string;
       
       let whereConditions: string[] = [];
       let params: any[] = [];
+      
+      // Se statusIds fornecidos, usar eles
+      if (statusIds) {
+        const statusIdList = statusIds.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+        if (statusIdList.length > 0) {
+          whereConditions.push(`mo.status_id IN (${statusIdList.join(',')})`);
+        }
+      }
       
       if (isAdmin) {
         // Admin pode ver todas as cirurgias
@@ -3927,9 +4080,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const query = `
         SELECT 
-          COUNT(*) FILTER (WHERE mo.status_id NOT IN (1, 5, 7)) as completed_count,
-          COUNT(*) FILTER (WHERE mo.status_id = 1) as incomplete_count,
-          COUNT(*) FILTER (WHERE mo.status_id IN (5, 7)) as cancelled_count,
+          COUNT(*) FILTER (WHERE mo.status_id = 6) as completed_count,
+          COUNT(*) FILTER (WHERE mo.status_id = 9) as received_count,
           COUNT(*) as total_count
         FROM medical_orders mo
         ${whereClause}
@@ -3938,8 +4090,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const result = await pool.query(query, params);
       const stats = {
         completedCount: parseInt(result.rows[0].completed_count || '0'),
-        incompleteCount: parseInt(result.rows[0].incomplete_count || '0'),
-        cancelledCount: parseInt(result.rows[0].cancelled_count || '0'),
+        receivedCount: parseInt(result.rows[0].received_count || '0'),
         totalCount: parseInt(result.rows[0].total_count || '0')
       };
       
@@ -3960,16 +4111,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const isAdmin = req.user?.roleId === 1;
       
       if (!userId) {
-        return res.json({ completedCount: 0, incompleteCount: 0, cancelledCount: 0, totalCount: 0, suppliersCount: 0 });
+        return res.json({ completedCount: 0, receivedCount: 0, totalCount: 0, suppliersCount: 0 });
       }
       
       // Extrair filtros da query string
       const startDate = req.query.startDate as string;
       const endDate = req.query.endDate as string;
       const hospitalIdFilter = req.query.hospitalId as string;
+      const statusIds = req.query.statusIds as string;
       
       let whereConditions: string[] = [];
       let params: any[] = [];
+      
+      // Se statusIds fornecidos, usar eles
+      if (statusIds) {
+        const statusIdList = statusIds.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+        if (statusIdList.length > 0) {
+          whereConditions.push(`mo.status_id IN (${statusIdList.join(',')})`);
+        }
+      }
       
       if (isAdmin) {
         // Admin pode ver todas as cirurgias
@@ -3999,27 +4159,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
       
-      // Query para estatísticas gerais
+      // Query para estatísticas (apenas status 6 e 9)
       const statsQuery = `
         SELECT 
-          COUNT(*) FILTER (WHERE mo.status_id NOT IN (1, 5, 7)) as completed_count,
-          COUNT(*) FILTER (WHERE mo.status_id = 1) as incomplete_count,
-          COUNT(*) FILTER (WHERE mo.status_id IN (5, 7)) as cancelled_count,
+          COUNT(*) FILTER (WHERE mo.status_id = 6) as completed_count,
+          COUNT(*) FILTER (WHERE mo.status_id = 9) as received_count,
           COUNT(*) as total_count
         FROM medical_orders mo
         ${whereClause}
       `;
       
-      // Query para contar fornecedores únicos (apenas em pedidos válidos)
-      const supplierWhereConditions = [...whereConditions];
-      supplierWhereConditions.push('mo.status_id NOT IN (1, 5, 7)');
-      const supplierWhereClause = supplierWhereConditions.length > 0 ? `WHERE ${supplierWhereConditions.join(' AND ')}` : '';
-      
+      // Query para contar fornecedores únicos
       const suppliersQuery = `
         SELECT COUNT(DISTINCT mos.supplier_id) as suppliers_count
         FROM medical_orders mo
         INNER JOIN medical_order_suppliers mos ON mo.id = mos.order_id
-        ${supplierWhereClause}
+        ${whereClause}
       `;
       
       const statsResult = await pool.query(statsQuery, params);
@@ -4027,8 +4182,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const stats = {
         completedCount: parseInt(statsResult.rows[0].completed_count || '0'),
-        incompleteCount: parseInt(statsResult.rows[0].incomplete_count || '0'),
-        cancelledCount: parseInt(statsResult.rows[0].cancelled_count || '0'),
+        receivedCount: parseInt(statsResult.rows[0].received_count || '0'),
         totalCount: parseInt(statsResult.rows[0].total_count || '0'),
         suppliersCount: parseInt(suppliersResult.rows[0].suppliers_count || '0')
       };
@@ -4054,10 +4208,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const endDate = req.query.endDate as string;
       const statusFilter = req.query.status as string;
       const hospitalIdFilter = req.query.hospitalId as string;
+      const statusIds = req.query.statusIds as string;
       
       console.log(`=== SUPPLIER-DISTRIBUTION-WORKING - FORNECEDORES POR CIRURGIAS ===`);
       console.log(`Usuário ID: ${userId}, É Admin: ${isAdmin}`);
-      console.log(`Filtros aplicados:`, { startDate, endDate, statusFilter, hospitalIdFilter });
+      console.log(`Filtros aplicados:`, { startDate, endDate, statusFilter, hospitalIdFilter, statusIds });
       
       // Se não há usuário autenticado, retornar array vazio
       if (!userId) {
@@ -4068,8 +4223,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let params: any[] = [];
       let whereConditions: string[] = [];
       
-      // Condição base: excluir pedidos incompletos e cancelados
-      whereConditions.push("mo.status_id NOT IN (1, 5, 7)");
+      // Se statusIds fornecidos, usar eles; caso contrário, usar filtro padrão
+      if (statusIds) {
+        const statusIdList = statusIds.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+        if (statusIdList.length > 0) {
+          whereConditions.push(`mo.status_id IN (${statusIdList.join(',')})`);
+        }
+      } else {
+        // Condição base: excluir pedidos incompletos e cancelados
+        whereConditions.push("mo.status_id NOT IN (1, 5, 7)");
+      }
       
       if (isAdmin) {
         // Admin pode ver todas as cirurgias
