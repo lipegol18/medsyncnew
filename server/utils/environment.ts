@@ -82,7 +82,7 @@ class EnvironmentManager {
     // Priority 3: Localhost fallback (development)
     const protocol = 'http';
     const domain = 'localhost';
-    const port = 5000;
+    const port = 5001;
     const baseUrl = this.buildBaseUrl(protocol, domain, port);
 
     return {
