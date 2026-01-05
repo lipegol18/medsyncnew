@@ -52,7 +52,7 @@ class EnvironmentManager {
     if (process.env.APP_DOMAIN) {
       const protocol = (process.env.APP_PROTOCOL || 'https') as 'http' | 'https';
       const domain = process.env.APP_DOMAIN;
-      const port = process.env.APP_PORT ? parseInt(process.env.APP_PORT) : undefined;
+      const port = process.env.APP_PORT ? parseInt(process.env.APP_PORT) : DEFAULT_APP_PORT;
 
       const baseUrl = this.buildBaseUrl(protocol, domain, port);
 
@@ -85,7 +85,7 @@ class EnvironmentManager {
     // Priority 3: Localhost fallback (development)
     const protocol = 'http';
     const domain = 'localhost';
-    const port = 5001;
+    const port = DEFAULT_APP_PORT;
     const baseUrl = this.buildBaseUrl(protocol, domain, port);
 
     return {
@@ -105,9 +105,10 @@ class EnvironmentManager {
     // Skip port if it's the default for the protocol
     const shouldIncludePort = port && !this.isDefaultPort(protocol, port);
     
-    if (shouldIncludePort) {
-      return `${protocol}://${domain}:${port}`;
-    }
+    // // DP - Comentei para remover a porta da URL 
+    //if (shouldIncludePort) {
+    //  return `${protocol}://${domain}:${port}`;
+    //}
     
     return `${protocol}://${domain}`;
   }
