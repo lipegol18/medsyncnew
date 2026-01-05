@@ -91,7 +91,7 @@ class EnvironmentManager {
     const port = DEFAULT_APP_PORT;
     // DP - Remove para eliminar a porta da URL
     //const baseUrl = this.buildBaseUrl(protocol, domain, port);
-    const baseUrl = this.buildBaseUrl(protocol, domain);
+    const baseUrl = `${protocol}://${domain}`;
 
     return {
       protocol,
