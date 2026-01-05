@@ -33,7 +33,7 @@ const getCorsOrigins = () => {
 
   // Only allow localhost in development environment for security
   if (isDevelopment()) {
-    origins.push("http://localhost:5000");
+    origins.push("http://localhost:5001");
     origins.push("http://localhost:3000");
   }
 
