@@ -20,6 +20,9 @@
  * - REPLIT_DEV_DOMAIN: Auto-set by Replit (e.g., your-repl.replit.dev)
  */
 
+const DEFAULT_APP_PORT = 5001; // <-- escolhe um valor padrão fixo
+
+
 interface EnvironmentConfig {
   protocol: 'http' | 'https';
   domain: string;
@@ -252,6 +255,17 @@ class EnvironmentManager {
   isReplitPlatform(): boolean {
     return this.config.isReplit;
   }
+  getPort() {
+    const raw = process.env.APP_PORT ?? process.env.PORT;
+
+    if (!raw || raw.trim() === "") return DEFAULT_APP_PORT;
+
+    const port = parseInt(raw, 10);
+    if (Number.isNaN(port) || port <= 0 || port > 65535)
+      return DEFAULT_APP_PORT;
+
+    return port;
+  }
 }
 
 // Singleton instance
@@ -266,3 +280,4 @@ export const isProduction = () => environment.isProduction();
 export const isStaging = () => environment.isStaging();
 export const isDevelopment = () => environment.isDevelopment();
 export const isReplit = () => environment.isReplitPlatform();
+export const getPort = () => environment.getPort();

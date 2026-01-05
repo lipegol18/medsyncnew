@@ -7,6 +7,7 @@ import { setupVite, serveStatic, log } from "./vite";
 import { addStaticRoutes } from "./static-routes";
 import { accessMonitorMiddleware } from "./middlewares/access-monitor";
 import { getBaseUrl, isReplit, isDevelopment } from "./utils/environment";
+import { getPort } from "./utils/environment";
 
 const app = express();
 
@@ -358,7 +359,7 @@ app.use((req, res, next) => {
   // ALWAYS serve the app on port 5000
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
-  const port = 5001;
+  const port = getPort();
   server.listen(
     {
       port,
