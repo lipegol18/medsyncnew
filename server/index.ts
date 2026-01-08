@@ -7,6 +7,7 @@ import { setupVite, serveStatic, log } from "./vite";
 import { addStaticRoutes } from "./static-routes";
 import { accessMonitorMiddleware } from "./middlewares/access-monitor";
 import { getBaseUrl, isReplit, isDevelopment } from "./utils/environment";
+import { getPort } from "./utils/environment";
 
 const app = express();
 
@@ -14,8 +15,8 @@ const app = express();
 // O Stripe precisa do corpo bruto (raw body) para verificar a assinatura
 // Esta condição DEVE vir ANTES do express.json()
 app.use((req, res, next) => {
-  if (req.path === '/api/webhooks/stripe') {
-    express.raw({ type: 'application/json' })(req, res, next);
+  if (req.path === "/api/webhooks/stripe") {
+    express.raw({ type: "application/json" })(req, res, next);
   } else {
     next();
   }
@@ -149,9 +150,14 @@ app.use((req, res, next) => {
 
   // Add discount admin routes (new 3-table architecture)
   const { getPaymentProvider } = await import("./payments");
-  const createDiscountAdminRouter = await import("./routes/discounts-admin-routes");
+  const createDiscountAdminRouter = await import(
+    "./routes/discounts-admin-routes"
+  );
   const stripeProvider = getPaymentProvider();
-  app.use("/api/admin/discounts", createDiscountAdminRouter.default(stripeProvider as any));
+  app.use(
+    "/api/admin/discounts",
+    createDiscountAdminRouter.default(stripeProvider as any),
+  );
 
   // Adicionar rotas para arquivos estáticos (mockups, etc)
   addStaticRoutes(app);
@@ -358,7 +364,7 @@ app.use((req, res, next) => {
   // ALWAYS serve the app on port 5000
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
-  const port = 5000;
+  const port = getPort();
   server.listen(
     {
       port,
