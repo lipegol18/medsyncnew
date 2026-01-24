@@ -7482,6 +7482,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .select({
           id: medicalOrderOpmeItems.id,
           quantity: medicalOrderOpmeItems.quantity,
+          quantityApproved: medicalOrderOpmeItems.quantityApproved,
+          status: medicalOrderOpmeItems.status,
           procedure: {
             id: procedures.id,
             code: procedures.code,
@@ -7523,6 +7525,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Erro ao buscar materiais OPME do pedido:", error);
       res.status(500).json({ 
         message: "Erro ao buscar materiais OPME do pedido",
+        error: error.message 
+      });
+    }
+  });
+
+  // API para atualizar aprovação de item OPME
+  app.put("/api/medical-order-opme-items/:id/approval", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const opmeItemId = parseInt(req.params.id);
+      const { status, quantityApproved } = req.body;
+
+      console.log(`Atualizando aprovação do item OPME ${opmeItemId}:`, { status, quantityApproved });
+
+      if (isNaN(opmeItemId)) {
+        return res.status(400).json({ error: "ID de item OPME inválido" });
+      }
+
+      if (!status) {
+        return res.status(400).json({ error: "Status é obrigatório" });
+      }
+
+      // Validar status
+      const validStatuses = ['aprovado', 'negado', 'em_analise'];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({ error: "Status inválido" });
+      }
+
+      // Atualizar o item OPME
+      const [updatedItem] = await db
+        .update(medicalOrderOpmeItems)
+        .set({
+          status,
+          quantityApproved: status === 'aprovado' ? (quantityApproved || 0) : 0
+        })
+        .where(eq(medicalOrderOpmeItems.id, opmeItemId))
+        .returning();
+
+      if (!updatedItem) {
+        return res.status(404).json({ error: "Item OPME não encontrado" });
+      }
+
+      console.log(`Item OPME ${opmeItemId} atualizado:`, updatedItem);
+      res.status(200).json(updatedItem);
+    } catch (error) {
+      console.error("Erro ao atualizar aprovação de item OPME:", error);
+      res.status(500).json({ 
+        message: "Erro ao atualizar aprovação de item OPME",
         error: error.message 
       });
     }

@@ -1536,6 +1536,8 @@ export const medicalOrderOpmeItems = pgTable("medical_order_opme_items", {
   procedureId: integer("procedure_id").references(() => procedures.id), // Tornar procedureId opcional
   opmeItemId: integer("opme_item_id").notNull().references(() => opmeItems.id),
   quantity: integer("quantity").notNull().default(1),
+  quantityApproved: integer("quantity_approved"),
+  status: text("status").default('em_analise'),
   surgicalApproachId: integer("surgical_approach_id").references(() => surgicalApproaches.id, { onDelete: 'set null' }), // Conduta cirúrgica associada
   surgicalProcedureId: integer("surgical_procedure_id").references(() => surgicalProcedures.id, { onDelete: 'set null' }), // Procedimento cirúrgico associado
   createdAt: timestamp("created_at").notNull().defaultNow(),

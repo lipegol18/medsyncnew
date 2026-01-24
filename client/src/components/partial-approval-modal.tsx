@@ -7,6 +7,7 @@ import { CheckCircle, XCircle, Hash, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { PostApprovalDecisionModal } from "@/components/post-approval-decision-modal";
+import { OpmeApprovalModal } from "@/components/opme-approval-modal";
 
 interface ProcedureApproval {
   id: number;
@@ -39,7 +40,10 @@ export function PartialApprovalModal({
   const queryClient = useQueryClient();
   
   const [procedureApprovals, setProcedureApprovals] = useState<ProcedureApproval[]>([]);
+  const [showOpmeModal, setShowOpmeModal] = useState(false);
   const [showDecisionModal, setShowDecisionModal] = useState(false);
+  const [opmeApprovedCount, setOpmeApprovedCount] = useState(0);
+  const [opmeDeniedCount, setOpmeDeniedCount] = useState(0);
 
   // Buscar procedimentos do pedido
   const { data: procedures, isLoading } = useQuery({
@@ -88,13 +92,13 @@ export function PartialApprovalModal({
     },
     onSuccess: () => {
       toast({
-        title: "Aprovações salvas",
-        description: "As aprovações dos procedimentos foram atualizadas com sucesso.",
+        title: "Aprovações de procedimentos salvas",
+        description: "Agora vamos verificar os itens OPME.",
       });
       queryClient.invalidateQueries({ queryKey: ['/api/medical-orders', orderId, 'procedures'] });
       
-      // Mostrar modal de decisão (não fechar o modal principal ainda)
-      setShowDecisionModal(true);
+      // Mostrar modal de OPME antes do modal de decisão
+      setShowOpmeModal(true);
     },
     onError: (error) => {
       console.error('Erro ao salvar aprovações:', error);
@@ -182,9 +186,18 @@ export function PartialApprovalModal({
     }
   };
 
-  // Calcular estatísticas para o modal de decisão
-  const approvedItems = procedureApprovals.filter(proc => proc.status === 'aprovado').length;
-  const deniedItems = procedureApprovals.filter(proc => proc.status === 'negado').length;
+  // Calcular estatísticas para o modal de decisão (procedimentos + OPME)
+  const approvedItems = procedureApprovals.filter(proc => proc.status === 'aprovado').length + opmeApprovedCount;
+  const deniedItems = procedureApprovals.filter(proc => proc.status === 'negado').length + opmeDeniedCount;
+
+  // Função para lidar com a conclusão do modal OPME
+  const handleOpmeApprovalComplete = (opmeApproved: number, opmeDenied: number) => {
+    setOpmeApprovedCount(opmeApproved);
+    setOpmeDeniedCount(opmeDenied);
+    setShowOpmeModal(false);
+    // Agora mostrar o modal de decisão final
+    setShowDecisionModal(true);
+  };
 
   // Funções para lidar com as decisões do segundo modal
   const handleGenerateAppeal = async () => {
@@ -423,6 +436,18 @@ export function PartialApprovalModal({
           </button>
         </div>
       </div>
+
+      {/* Modal de Aprovação OPME */}
+      <OpmeApprovalModal
+        isOpen={showOpmeModal}
+        onClose={() => {
+          // Se o usuário fechar sem salvar OPME, ir direto para decisão
+          setShowOpmeModal(false);
+          setShowDecisionModal(true);
+        }}
+        orderId={orderId}
+        onApprovalComplete={handleOpmeApprovalComplete}
+      />
 
       {/* Modal de Decisão Pós-Aprovação */}
       <PostApprovalDecisionModal

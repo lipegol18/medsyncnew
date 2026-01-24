@@ -14,9 +14,7 @@ import {
   Edit,
   ExternalLink,
 } from "lucide-react";
-import { FaWhatsapp } from "react-icons/fa";
 import { SiInstagram } from "react-icons/si";
-import { useSupportContact } from "@/lib/support-contact";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -67,7 +65,6 @@ import { onlyNumbers } from "@/lib/utils";
 import { useValidation } from "@/hooks/use-validation";
 
 export default function AuthPage() {
-  const { openSupport } = useSupportContact();
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState<
     "login" | "register" | "forgot-password"
@@ -124,6 +121,35 @@ export default function AuthPage() {
       htmlElement.classList.remove("auth-page-forced-light");
       htmlElement.style.removeProperty("color-scheme");
       console.log("Auth page: Restored original theme");
+    };
+  }, []);
+
+  // Carregar o chatbot n8n
+  useEffect(() => {
+    // Carregar CSS do n8n chat
+    const link = document.createElement('link');
+    link.href = 'https://cdn.jsdelivr.net/npm/@n8n/chat/dist/style.css';
+    link.rel = 'stylesheet';
+    document.head.appendChild(link);
+
+    // Carregar script do n8n chat
+    const script = document.createElement('script');
+    script.type = 'module';
+    script.textContent = `
+      import { createChat } from 'https://cdn.jsdelivr.net/npm/@n8n/chat/dist/chat.bundle.es.js';
+      createChat({
+        webhookUrl: 'https://hook-prod.iotninja.com.br/webhook/9c294984-76bd-43a1-b93f-7a10a390bbd5/chat'
+      });
+    `;
+    document.body.appendChild(script);
+
+    // Cleanup
+    return () => {
+      link.remove();
+      script.remove();
+      // Remover elementos do chat se existirem
+      const chatElements = document.querySelectorAll('[class*="n8n-chat"]');
+      chatElements.forEach(el => el.remove());
     };
   }, []);
 
@@ -713,23 +739,6 @@ export default function AuthPage() {
         </div>
       </footer>
 
-      {/* Botão flutuante do WhatsApp */}
-      <div
-        className="fixed bottom-6 right-6 z-50 transform transition-all duration-300 hover:scale-110"
-        onClick={() => {
-          openSupport("Olá! Gostaria de saber mais sobre o MedSync.");
-        }}
-      >
-        <div className="bg-green-500 hover:bg-green-600 text-white p-2 rounded-full shadow-lg cursor-pointer transition-colors duration-200 group">
-          <FaWhatsapp className="h-6 w-6" />
-        </div>
-        {/* Tooltip */}
-        <div className="absolute bottom-full right-0 mb-2 hidden group-hover:block">
-          <div className="bg-black text-white text-xs py-1 px-2 rounded whitespace-nowrap">
-            Entre em contato via WhatsApp
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
