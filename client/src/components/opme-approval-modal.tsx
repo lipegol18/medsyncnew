@@ -19,7 +19,7 @@ interface OpmeApprovalModalProps {
   isOpen: boolean;
   onClose: () => void;
   orderId: number;
-  onApprovalComplete: (approvedCount: number, deniedCount: number) => void;
+  onApprovalComplete: (approvedCount: number, deniedCount: number, deniedItems?: Array<{name: string, quantity: number}>) => void;
 }
 
 export function OpmeApprovalModal({ 
@@ -81,7 +81,15 @@ export function OpmeApprovalModal({
       const approvedCount = opmeApprovals.filter(item => item.status === 'aprovado').length;
       const deniedCount = opmeApprovals.filter(item => item.status === 'negado').length;
       
-      onApprovalComplete(approvedCount, deniedCount);
+      // Coletar itens negados com seus nomes para o histórico
+      const deniedItems = opmeApprovals
+        .filter(item => item.status === 'negado')
+        .map(item => ({
+          name: item.technicalName || item.commercialName || 'Item OPME',
+          quantity: item.quantityRequested
+        }));
+      
+      onApprovalComplete(approvedCount, deniedCount, deniedItems);
     },
     onError: (error) => {
       console.error('Erro ao salvar aprovações OPME:', error);
@@ -192,6 +200,26 @@ export function OpmeApprovalModal({
             <X className="h-5 w-5" />
           </button>
         </div>
+
+        {/* Botão para marcar todos como aprovados */}
+        {!isLoading && hasOpmeItems && (
+          <div className="flex justify-end mb-3">
+            <button
+              type="button"
+              onClick={() => {
+                setOpmeApprovals(prev => prev.map(item => ({
+                  ...item,
+                  status: 'aprovado',
+                  quantityApproved: item.quantityRequested
+                })));
+              }}
+              className="flex items-center gap-2 px-3 py-1.5 text-xs sm:text-sm font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors"
+            >
+              <CheckCircle className="h-3.5 w-3.5" />
+              Marcar todos como Aprovado
+            </button>
+          </div>
+        )}
 
         {isLoading ? (
           <div className="flex justify-center py-12">

@@ -106,6 +106,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // API para buscar todos os status de pedidos (ordem por display_order)
+  app.get("/api/order-statuses", async (req: Request, res: Response) => {
+    try {
+      const result = await pool.query(`
+        SELECT id, code, name, display_order, color, icon
+        FROM order_statuses
+        ORDER BY display_order ASC
+      `);
+      
+      res.json(result.rows);
+    } catch (error) {
+      console.error("Erro ao buscar status de pedidos:", error);
+      res.status(500).json({ message: "Erro ao buscar status de pedidos" });
+    }
+  });
+
   // Nova API de cirurgias por hospital com filtragem correta
   app.get("/api/reports/hospital-distribution", async (req: Request, res: Response) => {
     try {
@@ -2566,12 +2582,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
               7: 'cancelado',          // Cancelada
               8: 'aguardando_envio',   // Aguardando Envio
               9: 'recebido',           // Recebido
-              10: 'aguardando_recurso' // Aguardando Recurso
+              10: 'aguardando_recurso', // Aguardando Recurso
+              11: 'autorizacao_pos'    // Autorização Pós (urgência)
             };
 
             // Buscar informações de cor do cache
             const cachedStatus = (global as any).statusColorCache?.[order.statusId];
             
+            // Verificar se existe um estado anterior DIFERENTE do atual para poder desfazer
+            let canUndoStatus = false;
+            try {
+              // Buscar se existe algum registro de mudança de status com status diferente do atual
+              const differentStatusRecord = await db.select({
+                statusId: medicalOrderStatusHistory.statusId
+              })
+                .from(medicalOrderStatusHistory)
+                .where(
+                  and(
+                    eq(medicalOrderStatusHistory.orderId, order.id),
+                    eq(medicalOrderStatusHistory.recordType, 'status_change'),
+                    ne(medicalOrderStatusHistory.statusId, order.statusId)
+                  )
+                )
+                .limit(1);
+              
+              // Pode desfazer se existir pelo menos um registro com status diferente
+              canUndoStatus = differentStatusRecord.length > 0;
+            } catch (error) {
+              console.log(`Erro ao verificar histórico de status para pedido ${order.id}:`, error);
+            }
             
             return {
               id: order.id,
@@ -2586,7 +2625,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
               procedureLaterality: order.procedureLaterality,
               status: statusMapping[order.statusId as keyof typeof statusMapping] || "nao_especificado",
               statusId: order.statusId,
-              previousStatusId: order.previousStatusId,
               // Adicionar campos de cor do cache
               statusName: cachedStatus?.statusName || null,
               statusColor: cachedStatus?.statusColor || null,
@@ -2600,7 +2638,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               cidCodes: orderCids,
               surgicalApproaches: orderApproaches,
               surgicalProcedures: orderProcedures,
-              clinicalJustification: order.clinicalJustification || null
+              clinicalJustification: order.clinicalJustification || null,
+              canUndoStatus: canUndoStatus
             };
           })
         );
@@ -2794,11 +2833,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
           7: 'cancelado',          // Cancelada
           8: 'aguardando_envio',   // Aguardando Envio
           9: 'recebido',           // Recebido
-          10: 'aguardando_recurso' // Aguardando Recurso
+          10: 'aguardando_recurso', // Aguardando Recurso
+          11: 'autorizacao_pos'    // Autorização Pós (urgência)
         };
 
         // Buscar informações de cor do cache
         const cachedStatus = (global as any).statusColorCache?.[order.statusId];
+
+        // Verificar se existe um estado anterior DIFERENTE do atual para poder desfazer
+        let canUndoStatus = false;
+        try {
+          // Buscar se existe algum registro de mudança de status com status diferente do atual
+          const differentStatusRecord = await db.select({
+            statusId: medicalOrderStatusHistory.statusId
+          })
+            .from(medicalOrderStatusHistory)
+            .where(
+              and(
+                eq(medicalOrderStatusHistory.orderId, order.id),
+                eq(medicalOrderStatusHistory.recordType, 'status_change'),
+                ne(medicalOrderStatusHistory.statusId, order.statusId)
+              )
+            )
+            .limit(1);
+          
+          // Pode desfazer se existir pelo menos um registro com status diferente
+          canUndoStatus = differentStatusRecord.length > 0;
+        } catch (error) {
+          console.log(`Erro ao verificar histórico de status para pedido ${order.id}:`, error);
+        }
 
         const enrichedOrder = {
           id: order.id,
@@ -2814,7 +2877,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           status: statusMapping[order.statusId as keyof typeof statusMapping] || "nao_especificado",
           statusCode: statusMapping[order.statusId as keyof typeof statusMapping] || "nao_especificado",
           statusId: order.statusId,
-          previousStatusId: order.previousStatusId,
           // Adicionar campos de cor do cache
           statusName: cachedStatus?.statusName || null,
           statusColor: cachedStatus?.statusColor || null,
@@ -2853,7 +2915,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             logoUrl: hospitalData.logoUrl
           } : null,
           // ✅ AGENDAMENTO CIRÚRGICO: Incluir dados do agendamento para validação de status
-          surgeryAppointment: surgeryAppointment
+          surgeryAppointment: surgeryAppointment,
+          // ✅ PODE DESFAZER STATUS: Indica se existe um estado anterior diferente do atual
+          canUndoStatus: canUndoStatus
         };
 
         console.log(`✅ Pedido médico ${orderId} encontrado com statusColorClasses:`, !!enrichedOrder.statusColorClasses);
@@ -6648,6 +6712,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Não incluir campos removidos: cidCodeId, opmeItemIds, supplierIds, etc.
         };
 
+        // Guardar status anterior para detectar mudança
+        const previousStatusId = currentOrder.statusId;
+
         // Atualizar o pedido médico no banco de dados
         const updatedOrder = await storage.updateMedicalOrder(
           orderId,
@@ -6661,6 +6728,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res
             .status(404)
             .json({ error: "Pedido médico não encontrado" });
+        }
+
+        // ===== REGISTRAR MUDANÇA DE STATUS NO HISTÓRICO =====
+        // Se o status mudou (ex: de incompleto para aguardando envio), registrar no histórico
+        if (updatedOrder.statusId !== previousStatusId) {
+          try {
+            // Buscar nomes dos status para mensagem mais clara
+            const [previousStatusInfo, newStatusInfo] = await Promise.all([
+              db.select().from(orderStatuses).where(eq(orderStatuses.id, previousStatusId)).limit(1),
+              db.select().from(orderStatuses).where(eq(orderStatuses.id, updatedOrder.statusId)).limit(1)
+            ]);
+
+            const previousStatusName = previousStatusInfo[0]?.name || `ID ${previousStatusId}`;
+            const newStatusName = newStatusInfo[0]?.name || `ID ${updatedOrder.statusId}`;
+
+            const historyData = {
+              orderId: orderId,
+              statusId: updatedOrder.statusId,
+              changedBy: userId,
+              notes: `Status alterado de "${previousStatusName}" para "${newStatusName}"`,
+              recordType: 'status_change',
+              changedAt: new Date()
+            };
+
+            await db.insert(medicalOrderStatusHistory).values(historyData);
+            console.log(`✅ Mudança de status registrada no histórico: ${previousStatusName} → ${newStatusName}`);
+          } catch (historyError) {
+            console.error("Erro ao registrar mudança de status no histórico:", historyError);
+          }
         }
 
         // ===== ATUALIZAR DADOS RELACIONAIS =====
@@ -8084,14 +8180,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const statusId = statusInfo[0].id;
-      const previousStatusId = existingOrder.statusId;
 
-      // Atualizar o status no banco de dados e salvar o status anterior
+      // Atualizar o status no banco de dados (histórico é gerenciado via medical_order_status_history)
       const [updatedOrder] = await db
         .update(medicalOrders)
         .set({ 
           statusId: statusId,
-          previousStatusId: previousStatusId, // Salvar o status anterior para função desfazer
           updatedAt: new Date()
         })
         .where(eq(medicalOrders.id, orderId))
@@ -8119,11 +8213,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Criar entrada no histórico
+      const previousStatus = existingOrder.statusCode || existingOrder.statusId;
       const historyData = {
         orderId: orderId,
         statusId: statusId,
         changedBy: userId || null,
-        notes: notes || `Status alterado de ${previousStatusId || 'indefinido'} para ${status}`,
+        notes: notes || `Status alterado de ${previousStatus || 'indefinido'} para ${status}`,
+        recordType: 'status_change',
         deadlineDate: deadlineDate,
         nextNotificationAt: nextNotificationAt
       };
@@ -8135,18 +8231,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`✅ Registro de histórico criado: ID ${historyRecord.id}`);
       
-      // 🔥 AUTORIZAÇÃO AUTOMÁTICA DE PROCEDIMENTOS para status "aceito" (Autorizado)
+      // 🔥 AUTORIZAÇÃO AUTOMÁTICA DE PROCEDIMENTOS E OPME para status "aceito" (Autorizado)
       if (status === 'aceito') {
         try {
-          console.log(`🔄 Autorizando automaticamente todos os procedimentos CBHPM do pedido ${orderId} (status: aceito)`);
+          console.log(`🔄 Autorizando automaticamente todos os procedimentos CBHPM e itens OPME do pedido ${orderId} (status: aceito)`);
           
-          // Buscar todos os procedimentos CBHPM do pedido
+          // 1. Autorizar todos os procedimentos CBHPM
           const procedures = await storage.getMedicalOrderProcedures(orderId);
-          console.log(`📋 Encontrados ${procedures.length} procedimentos para autorizar`);
+          console.log(`📋 Encontrados ${procedures.length} procedimentos CBHPM para autorizar`);
           
-          let authorizedCount = 0;
+          let authorizedProceduresCount = 0;
           
-          // Atualizar cada procedimento para status "autorizado" com quantidade total aprovada
           for (const procedure of procedures) {
             const result = await storage.updateProcedureApprovalStatus(
               procedure.id,
@@ -8155,17 +8250,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
             );
             
             if (result) {
-              authorizedCount++;
-              console.log(`✅ Procedimento ${procedure.id} autorizado: ${procedure.quantityRequested} unidades`);
+              authorizedProceduresCount++;
+              console.log(`✅ Procedimento CBHPM ${procedure.id} autorizado: ${procedure.quantityRequested} unidades`);
             } else {
-              console.log(`❌ Falha ao autorizar procedimento ${procedure.id}`);
+              console.log(`❌ Falha ao autorizar procedimento CBHPM ${procedure.id}`);
             }
           }
           
-          console.log(`🎉 Autorização completa: ${authorizedCount}/${procedures.length} procedimentos autorizados`);
+          console.log(`🎉 Autorização CBHPM completa: ${authorizedProceduresCount}/${procedures.length} procedimentos autorizados`);
+          
+          // 2. Autorizar todos os itens OPME
+          const opmeItems = await db
+            .select()
+            .from(medicalOrderOpmeItems)
+            .where(eq(medicalOrderOpmeItems.orderId, orderId));
+          
+          console.log(`📋 Encontrados ${opmeItems.length} itens OPME para autorizar`);
+          
+          let authorizedOpmeCount = 0;
+          
+          for (const opme of opmeItems) {
+            await db
+              .update(medicalOrderOpmeItems)
+              .set({
+                status: 'aprovado',
+                quantityApproved: opme.quantity // quantity_approved = quantity (autorização total)
+              })
+              .where(eq(medicalOrderOpmeItems.id, opme.id));
+            
+            authorizedOpmeCount++;
+            console.log(`✅ Item OPME ${opme.id} autorizado: ${opme.quantity} unidades`);
+          }
+          
+          console.log(`🎉 Autorização OPME completa: ${authorizedOpmeCount}/${opmeItems.length} itens autorizados`);
           
         } catch (procedureError) {
-          console.error('❌ Erro ao autorizar procedimentos automaticamente:', procedureError);
+          console.error('❌ Erro ao autorizar procedimentos/OPME automaticamente:', procedureError);
           // Não falhar a requisição - status foi atualizado com sucesso
           // Apenas logar o erro para investigação
         }
@@ -8174,7 +8294,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ 
         message: "Status atualizado com sucesso", 
         order: updatedOrder,
-        previousStatus: previousStatusId,
+        previousStatus: previousStatus,
         newStatus: status,
         historyRecord: historyRecord,
         deadlineDate: deadlineDate,
@@ -8186,11 +8306,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Desfazer última alteração de status (voltar ao status anterior)
+  // Desfazer última alteração de status (voltar ao status anterior via histórico)
   app.patch('/api/medical-orders/:id/undo-status', async (req, res) => {
     try {
       const orderId = parseInt(req.params.id);
       const userId = (req as any).user?.id;
+      const { notes: userNotes } = req.body || {};
 
       if (isNaN(orderId)) {
         return res.status(400).json({ error: "ID de pedido inválido" });
@@ -8212,46 +8333,117 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const order = existingOrder[0];
+      const currentStatusId = order.statusId;
 
-      // Verificar se existe um status anterior para desfazer
-      if (!order.previousStatusId) {
-        return res.status(400).json({ error: "Não há status anterior para desfazer" });
+      // CORREÇÃO DO LOOP: Buscar o histórico completo de status_change para encontrar
+      // o status que existia ANTES da última mudança para o status atual.
+      // Isso evita ciclos onde desfazer A→B→A→B infinitamente.
+      const historyRecords = await db
+        .select()
+        .from(medicalOrderStatusHistory)
+        .where(
+          and(
+            eq(medicalOrderStatusHistory.orderId, orderId),
+            eq(medicalOrderStatusHistory.recordType, 'status_change')
+          )
+        )
+        .orderBy(desc(medicalOrderStatusHistory.changedAt));
+
+      if (historyRecords.length < 2) {
+        return res.status(400).json({ error: "Não há status anterior para desfazer." });
       }
 
-      // Buscar informações do status anterior
-      const previousStatusInfo = await db
-        .select()
-        .from(orderStatuses)
-        .where(eq(orderStatuses.id, order.previousStatusId))
-        .limit(1);
+      // Encontrar o registro que MUDOU PARA o status atual (primeira ocorrência do status atual no histórico)
+      // e retornar o status do registro ANTERIOR a ele na linha do tempo
+      let previousStatusId: number | null = null;
+      
+      for (let i = 0; i < historyRecords.length; i++) {
+        const record = historyRecords[i];
+        // Encontramos a mudança para o status atual
+        if (record.statusId === currentStatusId) {
+          // O status anterior é o próximo registro na lista (mais antigo)
+          // que tem um status diferente do atual
+          for (let j = i + 1; j < historyRecords.length; j++) {
+            if (historyRecords[j].statusId !== currentStatusId) {
+              previousStatusId = historyRecords[j].statusId;
+              break;
+            }
+          }
+          break;
+        }
+      }
+
+      if (!previousStatusId) {
+        return res.status(400).json({ error: "Não há status anterior diferente para desfazer." });
+      }
+
+      // Buscar informações dos status (atual e anterior) para mostrar nomes
+      const [currentStatusInfo, previousStatusInfo] = await Promise.all([
+        db.select().from(orderStatuses).where(eq(orderStatuses.id, currentStatusId)).limit(1),
+        db.select().from(orderStatuses).where(eq(orderStatuses.id, previousStatusId)).limit(1)
+      ]);
 
       if (previousStatusInfo.length === 0) {
         return res.status(400).json({ error: "Status anterior não encontrado" });
       }
 
-      const currentStatusId = order.statusId;
-      const previousStatusId = order.previousStatusId;
+      const currentStatusName = currentStatusInfo[0]?.name || `ID ${currentStatusId}`;
+      const previousStatusName = previousStatusInfo[0]?.name || `ID ${previousStatusId}`;
 
       // Reverter para o status anterior
       const [updatedOrder] = await db
         .update(medicalOrders)
         .set({ 
           statusId: previousStatusId,
-          previousStatusId: null, // Limpar o status anterior após desfazer
           updatedAt: new Date()
         })
         .where(eq(medicalOrders.id, orderId))
         .returning();
 
-      console.log(`Status desfeito. Status revertido de ${currentStatusId} para ${previousStatusId}`);
+      console.log(`Status desfeito. Status revertido de "${currentStatusName}" para "${previousStatusName}"`);
 
-      // Registrar no histórico que foi desfeito
+      // Verificar se precisa remover agendamento cirúrgico
+      // Se o status anterior é "Em Análise" (em_avaliacao) ou status anterior a ele,
+      // precisamos remover qualquer agendamento existente
+      const previousStatusCode = previousStatusInfo[0]?.code;
+      const statusesWithoutAppointment = ['em_preenchimento', 'aguardando_envio', 'em_avaliacao', 'pendencia', 'aguardando_recurso'];
+      
+      let appointmentRemoved = false;
+      if (statusesWithoutAppointment.includes(previousStatusCode)) {
+        // Verificar se existe agendamento para este pedido
+        const existingAppointment = await db
+          .select()
+          .from(surgeryAppointments)
+          .where(eq(surgeryAppointments.medicalOrderId, orderId))
+          .limit(1);
+        
+        if (existingAppointment.length > 0) {
+          // Remover o agendamento
+          await db
+            .delete(surgeryAppointments)
+            .where(eq(surgeryAppointments.medicalOrderId, orderId));
+          
+          appointmentRemoved = true;
+          console.log(`🗑️ Agendamento cirúrgico removido para pedido ${orderId} (status voltou para ${previousStatusCode})`);
+        }
+      }
+
+      // Registrar no histórico que foi desfeito (com recordType específico para não criar loops)
+      let systemNote = `Status desfeito - revertido de "${currentStatusName}" para "${previousStatusName}"`;
+      if (appointmentRemoved) {
+        systemNote += '\n\nAgendamento cirúrgico removido automaticamente.';
+      }
+      const finalNote = userNotes 
+        ? `${systemNote}\n\nMotivo: ${userNotes}`
+        : systemNote;
+
       const historyData = {
         orderId: orderId,
         statusId: previousStatusId,
         changedBy: userId,
-        notes: `Status desfeito - revertido de ${currentStatusId} para ${previousStatusId}`,
-        changedAt: new Date()
+        notes: finalNote,
+        changedAt: new Date(),
+        recordType: 'status_undo' // Marcar como undo para não interferir em buscas de status anterior
       };
 
       const [historyRecord] = await db
@@ -8262,14 +8454,113 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('✅ Entrada no histórico criada:', historyRecord);
 
       res.json({
-        message: "Status desfeito com sucesso",
+        message: appointmentRemoved 
+          ? "Status desfeito com sucesso e agendamento removido"
+          : "Status desfeito com sucesso",
         order: updatedOrder,
         revertedFrom: currentStatusId,
         revertedTo: previousStatusId,
-        historyRecord: historyRecord
+        historyRecord: historyRecord,
+        appointmentRemoved: appointmentRemoved
       });
     } catch (error) {
       console.error('Erro ao desfazer status do pedido:', error);
+      res.status(500).json({ error: "Erro interno do servidor" });
+    }
+  });
+
+  // Buscar histórico completo de status do pedido
+  app.get('/api/medical-orders/:id/status-history', async (req, res) => {
+    try {
+      const orderId = parseInt(req.params.id);
+
+      if (isNaN(orderId)) {
+        return res.status(400).json({ error: "ID de pedido inválido" });
+      }
+
+      // Buscar todos os registros do histórico ordenados por data (mais recente primeiro)
+      const historyRecords = await db
+        .select({
+          id: medicalOrderStatusHistory.id,
+          orderId: medicalOrderStatusHistory.orderId,
+          statusId: medicalOrderStatusHistory.statusId,
+          statusCode: orderStatuses.code,
+          statusName: orderStatuses.name,
+          statusColor: orderStatuses.color,
+          changedBy: medicalOrderStatusHistory.changedBy,
+          changedByName: users.name,
+          changedAt: medicalOrderStatusHistory.changedAt,
+          notes: medicalOrderStatusHistory.notes,
+          deadlineDate: medicalOrderStatusHistory.deadlineDate,
+          recordType: medicalOrderStatusHistory.recordType,
+        })
+        .from(medicalOrderStatusHistory)
+        .leftJoin(orderStatuses, eq(medicalOrderStatusHistory.statusId, orderStatuses.id))
+        .leftJoin(users, eq(medicalOrderStatusHistory.changedBy, users.id))
+        .where(eq(medicalOrderStatusHistory.orderId, orderId))
+        .orderBy(desc(medicalOrderStatusHistory.changedAt));
+
+      res.json(historyRecords);
+    } catch (error) {
+      console.error('Erro ao buscar histórico de status:', error);
+      res.status(500).json({ error: "Erro interno do servidor" });
+    }
+  });
+
+  // Adicionar nota ao histórico do pedido
+  app.post('/api/medical-orders/:id/notes', async (req, res) => {
+    try {
+      const orderId = parseInt(req.params.id);
+      const { notes } = req.body;
+      const userId = req.user?.id;
+
+      if (isNaN(orderId)) {
+        return res.status(400).json({ error: "ID de pedido inválido" });
+      }
+
+      if (!notes || notes.trim() === '') {
+        return res.status(400).json({ error: "A nota não pode estar vazia" });
+      }
+
+      // Verificar se o pedido existe
+      const existingOrder = await storage.getMedicalOrder(orderId);
+      if (!existingOrder) {
+        return res.status(404).json({ error: "Pedido não encontrado" });
+      }
+
+      // Inserir nota no histórico (sem status_id, é apenas uma nota)
+      const [newNote] = await db
+        .insert(medicalOrderStatusHistory)
+        .values({
+          orderId: orderId,
+          statusId: null, // Notas não têm status associado
+          changedBy: userId || null,
+          notes: notes.trim(),
+          recordType: 'note',
+        })
+        .returning();
+
+      // Buscar informações do usuário para retornar
+      const noteWithUser = await db
+        .select({
+          id: medicalOrderStatusHistory.id,
+          orderId: medicalOrderStatusHistory.orderId,
+          statusId: medicalOrderStatusHistory.statusId,
+          changedBy: medicalOrderStatusHistory.changedBy,
+          changedByName: users.name,
+          changedAt: medicalOrderStatusHistory.changedAt,
+          notes: medicalOrderStatusHistory.notes,
+          recordType: medicalOrderStatusHistory.recordType,
+        })
+        .from(medicalOrderStatusHistory)
+        .leftJoin(users, eq(medicalOrderStatusHistory.changedBy, users.id))
+        .where(eq(medicalOrderStatusHistory.id, newNote.id))
+        .limit(1);
+
+      console.log(`Nota adicionada ao pedido ${orderId} por usuário ${userId}`);
+      res.status(201).json(noteWithUser[0]);
+    } catch (error) {
+      console.error('Erro ao adicionar nota:', error);
       res.status(500).json({ error: "Erro interno do servidor" });
     }
   });

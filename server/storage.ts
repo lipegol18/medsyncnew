@@ -2261,7 +2261,6 @@ export class DatabaseStorage implements IStorage {
           createdAt: medicalOrders.createdAt,
           updatedAt: medicalOrders.updatedAt,
           statusId: medicalOrders.statusId,
-          previousStatusId: medicalOrders.previousStatusId,
           receivedValue: medicalOrders.receivedValue,
           attachments: medicalOrders.attachments,
         })

@@ -37,6 +37,8 @@ import {
   Download,
   Mail,
   MessageCircle,
+  GripVertical,
+  RotateCcw,
 } from "lucide-react";
 import {
   type Hospital,
@@ -183,6 +185,21 @@ export default function CreateOrder() {
   // Detectar se estamos em modo de edição
   const urlParams = new URLSearchParams(window.location.search);
   const editOrderId = urlParams.get('edit');
+
+  // Estados para marcadores de quebra de página ajustáveis (Step 4 - Visualização)
+  interface PageBreakInfo {
+    originalPosition: number;
+    adjustedPosition: number;
+  }
+  const orderPreviewRef = useRef<HTMLDivElement>(null);
+  const orderContainerRef = useRef<HTMLDivElement>(null);
+  const [orderPageBreaks, setOrderPageBreaks] = useState<PageBreakInfo[]>([]);
+  const [draggingBreakIndex, setDraggingBreakIndex] = useState<number | null>(null);
+  const [breakDragStartY, setBreakDragStartY] = useState<number>(0);
+  const [breakDragStartPosition, setBreakDragStartPosition] = useState<number>(0);
+  
+  const PAGE_HEIGHT_PX = 970; // Altura útil por página A4 em pixels
+  const MIN_PAGE_CONTENT = 200; // Mínimo de conteúdo por página
 
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [selectedHospital, setSelectedHospital] = useState<Hospital | null>(
@@ -2652,16 +2669,118 @@ export default function CreateOrder() {
       });
 
       // Preparar anexos de imagem para incluir no PDF
-      const imageAttachments = (currentOrderData?.attachments || []).filter((attachment: any) => 
+      const rawImageAttachments = (currentOrderData?.attachments || []).filter((attachment: any) => 
         attachment.type === 'image' || 
         (attachment.type && ['jpeg', 'jpg', 'png', 'gif', 'webp'].includes(attachment.type.toLowerCase())) ||
         (attachment.filename && /\.(jpeg|jpg|png|gif|webp)$/i.test(attachment.filename))
       );
 
+      // Função para calcular se a imagem tem proporção de documento A4
+      const calculateIsDocumentRatio = (width: number, height: number): boolean => {
+        const aspectRatio = Math.min(width, height) / Math.max(width, height);
+        return aspectRatio >= 0.6 && aspectRatio <= 0.85;
+      };
+
+      // Função para obter dimensões de uma imagem via URL
+      const getImageDimensionsFromUrl = (url: string): Promise<{ width: number; height: number }> => {
+        return new Promise((resolve) => {
+          const img = new window.Image();
+          img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+          img.onerror = () => resolve({ width: 0, height: 0 });
+          img.src = url;
+        });
+      };
+
+      // Processar anexos para detectar proporção
+      const imageAttachments = await Promise.all(
+        rawImageAttachments.map(async (attachment: any) => {
+          try {
+            const dimensions = await getImageDimensionsFromUrl(attachment.url);
+            const isDocumentRatio = dimensions.width > 0 && dimensions.height > 0 
+              ? calculateIsDocumentRatio(dimensions.width, dimensions.height)
+              : false;
+            console.log(`📐 Anexo "${attachment.filename}": ${dimensions.width}x${dimensions.height}, proporção documento: ${isDocumentRatio}`);
+            return { ...attachment, isDocumentRatio };
+          } catch {
+            return { ...attachment, isDocumentRatio: false };
+          }
+        })
+      );
+
       console.log(`📎 Encontradas ${imageAttachments.length} imagens para adicionar ao PDF:`, imageAttachments.map(a => a.filename));
 
+      // Calcular quebras de página manuais baseadas nas posições ajustadas
+      interface PageBreakConfig {
+        sectionIndex?: number;
+        justificationLineIndex?: number;
+      }
+      const pageBreakConfigs: PageBreakConfig[] = [];
+      
+      if (orderPageBreaks.length > 0) {
+        // Obter texto da justificativa para calcular linhas
+        const justificationText = currentOrderData?.clinical_justification || currentOrderData?.clinicalJustification || '';
+        // Usar parseMarkdownToPdf para obter o mesmo número de linhas que o PDF
+        const { parseMarkdownToPdf } = await import('@/components/order-pdf-document');
+        const pdfLines = parseMarkdownToPdf(justificationText);
+        const totalPdfLines = pdfLines.length;
+        
+        // Obter posição real da justificativa no DOM
+        const justificationBox = document.getElementById('justification-preview-box');
+        const documentoCompleto = document.getElementById('documento-completo');
+        
+        if (justificationBox && documentoCompleto) {
+          const docRect = documentoCompleto.getBoundingClientRect();
+          const justRect = justificationBox.getBoundingClientRect();
+          
+          // Posições relativas ao documento
+          const justificationStart = justRect.top - docRect.top;
+          const justificationEnd = justRect.bottom - docRect.top;
+          const justificationHeight = justRect.height;
+          
+          console.log('📄 Posições reais do DOM:', {
+            justificationStart,
+            justificationEnd,
+            justificationHeight,
+            totalPdfLines
+          });
+          
+          orderPageBreaks.forEach((breakInfo, breakIndex) => {
+            // Só processar se a quebra foi ajustada
+            if (breakInfo.adjustedPosition !== breakInfo.originalPosition) {
+              const breakPos = breakInfo.adjustedPosition;
+              
+              // Verificar se a quebra está dentro da justificativa
+              if (breakPos >= justificationStart && breakPos < justificationEnd) {
+                // Calcular posição relativa dentro da justificativa (0 a 1)
+                const relativePosition = (breakPos - justificationStart) / justificationHeight;
+                
+                // Aplicar proporção ao número de linhas do PDF
+                const lineIndex = Math.floor(relativePosition * totalPdfLines);
+                
+                // Adicionar quebra antes dessa linha (índice limitado ao número de linhas)
+                const safeLineIndex = Math.max(1, Math.min(lineIndex, totalPdfLines - 1));
+                pageBreakConfigs.push({ justificationLineIndex: safeLineIndex });
+                console.log(`📄 Quebra na justificativa: posição relativa ${(relativePosition * 100).toFixed(1)}% → linha ${safeLineIndex} de ${totalPdfLines}`);
+              } else if (breakPos < justificationStart) {
+                // Quebra antes da justificativa (seção 2)
+                pageBreakConfigs.push({ sectionIndex: 2 });
+                console.log(`📄 Quebra antes da justificativa (seção 2)`);
+              } else if (breakPos >= justificationEnd) {
+                // Quebra nas seções após a justificativa
+                pageBreakConfigs.push({ sectionIndex: 3 });
+                console.log(`📄 Quebra após a justificativa (seção 3)`);
+              }
+            }
+          });
+        } else {
+          console.warn('⚠️ Elementos DOM não encontrados para cálculo de quebras');
+        }
+
+        console.log('📄 Configurações de quebras de página:', pageBreakConfigs);
+      }
+
       // Gerar PDF principal usando react-pdf com quebra automática de páginas
-      const mainPdfBlob = await pdf(<OrderPDFDocument {...pdfData} attachments={imageAttachments} />).toBlob();
+      const mainPdfBlob = await pdf(<OrderPDFDocument {...pdfData} attachments={imageAttachments} pageBreakConfigs={pageBreakConfigs} />).toBlob();
 
       console.log("✅ PDF vetorial principal gerado! Tamanho:", mainPdfBlob.size, "bytes");
 
@@ -3279,14 +3398,22 @@ export default function CreateOrder() {
         console.error("Erro ao buscar attachments atuais:", error);
       }
       
-      // 2. Apenas mudar o status para "Aguardando Envio" com attachments preservados
+      // 2. Definir status baseado no tipo de procedimento (eletivo vs urgência)
+      // - Eletivo: vai para "Aguardando Envio" (ID 8)
+      // - Urgência: vai para "Autorização Pós" (ID 11)
+      const isUrgency = procedureType === PROCEDURE_TYPE_VALUES.URGENCIA;
+      const targetStatusId = isUrgency 
+        ? ORDER_STATUS_IDS.AUTORIZACAO_POS 
+        : ORDER_STATUS_IDS.AGUARDANDO_ENVIO;
+      const targetStatusLabel = isUrgency ? 'Autorização Pós' : 'Aguardando Envio';
+      
       const statusUpdateData = {
-        statusId: ORDER_STATUS_IDS.AGUARDANDO_ENVIO,
+        statusId: targetStatusId,
         // **PRESERVAR ATTACHMENTS**
         attachments: currentAttachments,
       };
 
-      console.log("🔄 Atualizando status do pedido para 'Aguardando Envio' (preservando attachments)...");
+      console.log(`🔄 Atualizando status do pedido para '${targetStatusLabel}' (preservando attachments)...`);
 
       // Utilizar o endpoint de update apenas para status
       const data = await apiRequest(
@@ -3451,6 +3578,116 @@ export default function CreateOrder() {
     setCurrentStep(stepNumber);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  // === QUEBRAS DE PÁGINA AJUSTÁVEIS (Step 4 - Visualização) ===
+  
+  // Calcular posições das quebras de página quando o preview é renderizado
+  useEffect(() => {
+    console.log('[PageBreaks] useEffect triggered, currentStep:', currentStep);
+    if (currentStep !== 4) {
+      console.log('[PageBreaks] Not step 4, skipping');
+      return;
+    }
+    if (!orderPreviewRef.current) {
+      console.log('[PageBreaks] orderPreviewRef.current is null');
+      return;
+    }
+    
+    // Pequeno delay para garantir que o conteúdo está renderizado
+    const timer = setTimeout(() => {
+      const previewHeight = orderPreviewRef.current?.scrollHeight || 0;
+      const numPages = Math.ceil(previewHeight / PAGE_HEIGHT_PX);
+      
+      console.log('[PageBreaks] previewHeight:', previewHeight, 'PAGE_HEIGHT_PX:', PAGE_HEIGHT_PX, 'numPages:', numPages);
+      
+      if (numPages <= 1) {
+        console.log('[PageBreaks] Only 1 page, no breaks needed');
+        setOrderPageBreaks([]);
+        return;
+      }
+      
+      const breaks: PageBreakInfo[] = [];
+      for (let i = 1; i < numPages; i++) {
+        const position = i * PAGE_HEIGHT_PX;
+        breaks.push({
+          originalPosition: position,
+          adjustedPosition: position
+        });
+      }
+      console.log('[PageBreaks] Setting breaks:', breaks);
+      setOrderPageBreaks(breaks);
+    }, 500); // Aumentado delay para garantir renderização
+    
+    return () => clearTimeout(timer);
+  }, [currentStep, selectedPatient, selectedHospital, clinicalIndication, clinicalJustification, secondaryProcedures]);
+
+  // Handlers para arrastar marcadores de quebra de página
+  const handleBreakDragStart = useCallback((e: React.MouseEvent, index: number) => {
+    e.preventDefault();
+    setDraggingBreakIndex(index);
+    setBreakDragStartY(e.clientY);
+    setBreakDragStartPosition(orderPageBreaks[index]?.adjustedPosition || 0);
+  }, [orderPageBreaks]);
+
+  const handleBreakDrag = useCallback((e: MouseEvent) => {
+    if (draggingBreakIndex === null) return;
+    
+    const deltaY = e.clientY - breakDragStartY;
+    const newPosition = breakDragStartPosition + deltaY;
+    const breakInfo = orderPageBreaks[draggingBreakIndex];
+    
+    if (!breakInfo) return;
+    
+    // Limite superior: posição da quebra anterior + MIN_PAGE_CONTENT
+    const previousBreakPosition = draggingBreakIndex > 0 
+      ? orderPageBreaks[draggingBreakIndex - 1].adjustedPosition 
+      : 0;
+    const minPosition = previousBreakPosition + MIN_PAGE_CONTENT;
+    
+    // Limite inferior: posição original (não pode passar do limite da página)
+    const maxPosition = breakInfo.originalPosition;
+    
+    // Aplicar limites
+    const clampedPosition = Math.max(minPosition, Math.min(maxPosition, newPosition));
+    
+    setOrderPageBreaks(prev => {
+      const updated = [...prev];
+      updated[draggingBreakIndex] = {
+        ...updated[draggingBreakIndex],
+        adjustedPosition: clampedPosition,
+      };
+      return updated;
+    });
+  }, [draggingBreakIndex, breakDragStartY, breakDragStartPosition, orderPageBreaks]);
+
+  const handleBreakDragEnd = useCallback(() => {
+    setDraggingBreakIndex(null);
+  }, []);
+
+  // Adicionar listeners globais para drag
+  useEffect(() => {
+    if (draggingBreakIndex !== null) {
+      document.addEventListener('mousemove', handleBreakDrag);
+      document.addEventListener('mouseup', handleBreakDragEnd);
+      document.body.style.cursor = 'ns-resize';
+      document.body.style.userSelect = 'none';
+      
+      return () => {
+        document.removeEventListener('mousemove', handleBreakDrag);
+        document.removeEventListener('mouseup', handleBreakDragEnd);
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      };
+    }
+  }, [draggingBreakIndex, handleBreakDrag, handleBreakDragEnd]);
+
+  // Resetar quebras de página para posições originais
+  const resetOrderPageBreaks = useCallback(() => {
+    setOrderPageBreaks(prev => prev.map(b => ({
+      ...b,
+      adjustedPosition: b.originalPosition
+    })));
+  }, []);
 
   // Função para navegar para o próximo passo
   const goToNextStep = async () => {
@@ -3952,14 +4189,118 @@ export default function CreateOrder() {
                   <p className="text-xs text-muted-foreground mt-1">
                     Prévia A4 (210 x 297 mm)
                   </p>
+                  
+                  {/* Controles de quebra de página */}
+                  {orderPageBreaks.length > 0 && (
+                    <div className="flex items-center gap-2 mt-2 mb-2">
+                      <span className="text-xs text-muted-foreground">
+                        Arraste as linhas para ajustar as quebras de página
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={resetOrderPageBreaks}
+                        className="text-xs h-6 px-2"
+                      >
+                        <RotateCcw className="w-3 h-3 mr-1" />
+                        Resetar
+                      </Button>
+                    </div>
+                  )}
 
                   {/* Div principal que conterá o documento para exportação futura em PDF */}
-                  <div className="flex justify-center mb-10">
-                    <div id="documento-completo" className="bg-white shadow-xl" style={{ width: '210mm', minHeight: '297mm' }}>
+                  <div className="flex justify-center mb-10 overflow-visible" ref={orderContainerRef}>
+                    <div id="documento-completo" className="bg-white shadow-xl relative overflow-visible" style={{ width: '210mm', minHeight: '297mm' }}>
+                      
+                      {/* Marcadores de quebra de página arrastáveis */}
+                      {console.log('[PageBreaks] Rendering markers, count:', orderPageBreaks.length)}
+                      {orderPageBreaks.map((breakInfo, index) => {
+                        console.log('[PageBreaks] Rendering marker', index, 'at position:', breakInfo.adjustedPosition);
+                        const isAdjusted = breakInfo.adjustedPosition !== breakInfo.originalPosition;
+                        const isDragging = draggingBreakIndex === index;
+                        
+                        return (
+                          <div
+                            key={index}
+                            className="absolute left-0 right-0 z-50"
+                            style={{ 
+                              top: `${breakInfo.adjustedPosition}px`,
+                              pointerEvents: 'auto'
+                            }}
+                          >
+                            <div className="relative">
+                              {/* Linha pontilhada */}
+                              <div 
+                                className={`border-t-2 border-dashed ${isAdjusted ? 'border-orange-500' : 'border-red-500'}`}
+                                style={{ width: '100%' }}
+                              />
+                              
+                              {/* Badge arrastável */}
+                              <div 
+                                className={`absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2 flex items-center gap-1 px-2 py-1 rounded-full text-white text-xs cursor-grab select-none transition-colors ${
+                                  isDragging 
+                                    ? 'bg-orange-600 cursor-grabbing scale-105' 
+                                    : isAdjusted 
+                                      ? 'bg-orange-500 hover:bg-orange-600' 
+                                      : 'bg-red-500 hover:bg-red-600'
+                                }`}
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  handleBreakDragStart(e, index);
+                                }}
+                                title="Arraste para ajustar a quebra de página"
+                              >
+                                <GripVertical className="h-3 w-3" />
+                                <span className="whitespace-nowrap">
+                                  Quebra {index + 1}
+                                  {isAdjusted && ' (ajustada)'}
+                                </span>
+                                
+                                {/* Botão de reset individual */}
+                                {isAdjusted && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setOrderPageBreaks(prev => {
+                                        const updated = [...prev];
+                                        updated[index] = {
+                                          ...updated[index],
+                                          adjustedPosition: updated[index].originalPosition,
+                                        };
+                                        return updated;
+                                      });
+                                    }}
+                                    className="ml-1 p-0.5 hover:bg-white/20 rounded"
+                                    title="Resetar para posição original"
+                                  >
+                                    <RotateCcw className="h-3 w-3" />
+                                  </button>
+                                )}
+                              </div>
+                              
+                              {/* Indicador de limite máximo (posição original) */}
+                              {isAdjusted && (
+                                <div 
+                                  className="absolute left-0 right-0 border-t border-dashed border-gray-300"
+                                  style={{ top: `${breakInfo.originalPosition - breakInfo.adjustedPosition}px` }}
+                                >
+                                  <div className="absolute -top-2 right-4 text-[10px] text-gray-400 bg-white px-1">
+                                    limite
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
                       
                       {/* Área de conteúdo com margens A4 */}
-                      <div style={{ marginTop: '20px', marginBottom: '20px', marginLeft: '30px', marginRight: '30px' }}>
-                        <div id="documento-pedido" className="w-full bg-white text-black p-2">
+                      <div 
+                        ref={orderPreviewRef}
+                        className="relative z-0"
+                        style={{ marginTop: '20px', marginBottom: '20px', marginLeft: '30px', marginRight: '30px' }}
+                      >
+                        <div id="documento-pedido" className="w-full bg-white text-black p-2 relative z-0">
                           {/* Cabeçalho com logos do hospital e médico */}
                           <div className="mb-2">
                             <div className="flex items-start justify-between">
@@ -4023,10 +4364,14 @@ export default function CreateOrder() {
                             </h2>
                             
                             {/* Justificativa clínica */}
-                            <div className="mt-2 text-xs text-justify bg-white p-2 rounded-md" style={{ 
-                              minHeight: '72px',  // Altura mínima (equivale a ~3 linhas)
-                              height: 'auto'      // Altura automática baseada no conteúdo
-                            }}>
+                            <div 
+                              id="justification-preview-box"
+                              className="mt-2 text-xs text-justify bg-white p-2 rounded-md" 
+                              style={{ 
+                                minHeight: '72px',  // Altura mínima (equivale a ~3 linhas)
+                                height: 'auto'      // Altura automática baseada no conteúdo
+                              }}
+                            >
                               {clinicalJustification ? (
                                 <MarkdownViewer content={clinicalJustification} className="prose-xs" />
                               ) : (

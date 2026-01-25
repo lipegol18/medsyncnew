@@ -1,6 +1,9 @@
+import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { 
   ArrowRight, 
   Send, 
@@ -12,7 +15,8 @@ import {
   DollarSign,
   Clock,
   FileText,
-  Stethoscope
+  Stethoscope,
+  Edit
 } from "lucide-react";
 
 interface StatusOption {
@@ -32,15 +36,19 @@ interface StatusChangeModalProps {
   orderId: number;
   currentStatus: string;
   currentStatusLabel: string;
-  onStatusChange: (orderId: number, newStatus: string) => void;
+  onStatusChange: (orderId: number, newStatus: string, notes?: string) => void;
   onPartialApproval?: (orderId: number) => void;
   onReceivedValues?: (orderId: number) => void;
   onEditOrder?: (order: any) => void;
+  onAppeal?: (orderId: number) => void; // Abrir modal de recurso
   order?: any; // Objeto order completo (inclui surgeryAppointment)
 }
 
-// Definição do workflow de estados com próximas etapas lógicas
-const workflowSteps: Record<string, StatusOption[]> = {
+// =====================================================
+// WORKFLOW ELETIVO - Cirurgias programadas (padrão)
+// Fluxo: Incompleto → Aguardando Envio → Em Análise → Autorizado → Cirurgia Realizada → Recebido
+// =====================================================
+const workflowStepsEletivo: Record<string, StatusOption[]> = {
   'em_preenchimento': [],
   'aguardando_envio': [
     { 
@@ -121,7 +129,6 @@ const workflowSteps: Record<string, StatusOption[]> = {
       color: 'text-destructive' 
     }
   ],
-
   'cirurgia_realizada': [
     { 
       key: 'recebido', 
@@ -134,11 +141,25 @@ const workflowSteps: Record<string, StatusOption[]> = {
   ],
   'pendencia': [
     { 
+      key: 'edit_order', 
+      label: 'Criar Nova Versão', 
+      description: 'Retificar o pedido com as correções solicitadas pela operadora', 
+      icon: Edit, 
+      color: 'text-medsync-blue' 
+    },
+    { 
       key: 'aguardando_recurso', 
-      label: 'Enviar Recurso', 
-      description: 'Contestar pendência com documentação adicional', 
+      label: 'Gerar Recurso', 
+      description: 'Contestar a decisão com justificativa médica adicional', 
       icon: FileText, 
       color: 'text-rose-600' 
+    },
+    { 
+      key: 'cancelado', 
+      label: 'Cancelar Pedido', 
+      description: 'Encerrar o pedido e registrar o motivo do cancelamento', 
+      icon: X, 
+      color: 'text-destructive' 
     }
   ],
   'cancelado': [
@@ -153,19 +174,178 @@ const workflowSteps: Record<string, StatusOption[]> = {
   'aguardando_recurso': [
     { 
       key: 'em_avaliacao', 
-      label: 'Retornar para Análise', 
-      description: 'Operadora aceita recurso e reanalisa pedido', 
+      label: 'Recurso enviado para análise', 
+      description: 'Recurso enviado para análise por parte da operadora', 
       icon: Clock, 
       color: 'text-accent' 
     },
     { 
       key: 'cancelado', 
-      label: 'Recurso Negado', 
-      description: 'Operadora mantém decisão original', 
+      label: 'Cancelar Pedido', 
+      description: 'Cancelar pedido definitivamente', 
       icon: X, 
       color: 'text-destructive' 
     }
   ]
+};
+
+// =====================================================
+// WORKFLOW URGÊNCIA - Cirurgias de emergência (retrospectivo)
+// Fluxo: Incompleto → Pós Autorizado → [Cirurgia pode já ter acontecido] → Em Análise → Autorizado → Recebido
+// A cirurgia pode ocorrer ANTES da autorização da operadora
+// =====================================================
+const workflowStepsUrgencia: Record<string, StatusOption[]> = {
+  'em_preenchimento': [],
+  // Estado inicial de urgência - a cirurgia pode já ter sido realizada
+  'autorizacao_pos': [
+    { 
+      key: 'cirurgia_realizada', 
+      label: 'Cirurgia Realizada', 
+      description: 'A cirurgia de urgência já foi executada', 
+      icon: Stethoscope, 
+      color: 'text-accent' 
+    },
+    { 
+      key: 'cancelado', 
+      label: 'Cancelar Pedido', 
+      description: 'Cancelar o pedido de urgência', 
+      icon: X, 
+      color: 'text-destructive' 
+    }
+  ],
+  // Após cirurgia de urgência realizada, vai para análise retrospectiva
+  'cirurgia_realizada': [
+    { 
+      key: 'em_avaliacao', 
+      label: 'Enviar para Análise Retrospectiva', 
+      description: 'Operadora irá analisar o pedido após a cirurgia ter sido realizada', 
+      icon: Clock, 
+      color: 'text-accent' 
+    }
+  ],
+  // Em análise - igual ao eletivo, mas pode vir de cirurgia já realizada
+  'em_avaliacao': [
+    { 
+      key: 'aceito', 
+      label: 'Autorizar Integralmente', 
+      description: 'Operadora aprovou todos os itens do pedido', 
+      icon: Check, 
+      color: 'text-emerald-600' 
+    },
+    { 
+      key: 'autorizado_parcial', 
+      label: 'Autorização Parcial', 
+      description: 'Operadora aprovou apenas alguns itens do pedido', 
+      icon: CheckCircle, 
+      color: 'text-violet-600',
+      requiresModal: true
+    },
+    { 
+      key: 'pendencia', 
+      label: 'Solicitar Documentação', 
+      description: 'Operadora solicita documentos adicionais', 
+      icon: AlertCircle, 
+      color: 'text-amber-600' 
+    },
+    { 
+      key: 'cancelado', 
+      label: 'Negar Pedido', 
+      description: 'Operadora recusou o pedido médico', 
+      icon: X, 
+      color: 'text-destructive' 
+    }
+  ],
+  // Autorizado em urgência - cirurgia já foi feita, vai direto para recebimento
+  'aceito': [
+    { 
+      key: 'recebido', 
+      label: 'Marcar como Recebido', 
+      description: 'Confirmar recebimento dos valores da operadora', 
+      icon: DollarSign, 
+      color: 'text-emerald-600',
+      requiresModal: true
+    }
+  ],
+  'autorizado_parcial': [
+    { 
+      key: 'recebido', 
+      label: 'Marcar como Recebido', 
+      description: 'Confirmar recebimento dos valores da operadora', 
+      icon: DollarSign, 
+      color: 'text-emerald-600',
+      requiresModal: true
+    }
+  ],
+  'pendencia': [
+    { 
+      key: 'edit_order', 
+      label: 'Criar Nova Versão', 
+      description: 'Retificar o pedido com as correções solicitadas pela operadora', 
+      icon: Edit, 
+      color: 'text-medsync-blue' 
+    },
+    { 
+      key: 'aguardando_recurso', 
+      label: 'Gerar Recurso', 
+      description: 'Contestar a decisão com justificativa médica adicional', 
+      icon: FileText, 
+      color: 'text-rose-600' 
+    },
+    { 
+      key: 'cancelado', 
+      label: 'Cancelar Pedido', 
+      description: 'Encerrar o pedido e registrar o motivo do cancelamento', 
+      icon: X, 
+      color: 'text-destructive' 
+    }
+  ],
+  'cancelado': [
+    { 
+      key: 'aguardando_recurso', 
+      label: 'Interpor Recurso', 
+      description: 'Contestar decisão de negativa da operadora', 
+      icon: FileText, 
+      color: 'text-rose-600' 
+    }
+  ],
+  'aguardando_recurso': [
+    { 
+      key: 'em_avaliacao', 
+      label: 'Recurso enviado para análise', 
+      description: 'Recurso enviado para análise por parte da operadora', 
+      icon: Clock, 
+      color: 'text-accent' 
+    },
+    { 
+      key: 'cancelado', 
+      label: 'Cancelar Pedido', 
+      description: 'Cancelar pedido definitivamente', 
+      icon: X, 
+      color: 'text-destructive' 
+    }
+  ],
+  // Aguardando envio também pode existir em urgência (caso ainda não tenha enviado)
+  'aguardando_envio': [
+    { 
+      key: 'em_avaliacao', 
+      label: 'Em Análise', 
+      description: 'Operadora está analisando o pedido médico', 
+      icon: Clock, 
+      color: 'text-accent' 
+    },
+    { 
+      key: 'cancelado', 
+      label: 'Cancelar Pedido', 
+      description: 'Cancelar antes da análise da operadora', 
+      icon: X, 
+      color: 'text-destructive' 
+    }
+  ]
+};
+
+// Função para selecionar o workflow baseado no tipo de procedimento
+const getWorkflowSteps = (procedureType?: string): Record<string, StatusOption[]> => {
+  return procedureType === 'urgencia' ? workflowStepsUrgencia : workflowStepsEletivo;
 };
 
 export function StatusChangeModal({
@@ -178,8 +358,14 @@ export function StatusChangeModal({
   onPartialApproval,
   onReceivedValues,
   onEditOrder,
+  onAppeal,
   order
 }: StatusChangeModalProps) {
+  // Estado para modal de confirmação de cancelamento
+  const [showCancelConfirmation, setShowCancelConfirmation] = useState(false);
+  const [cancelNotes, setCancelNotes] = useState("");
+  const [cancelOptionLabel, setCancelOptionLabel] = useState("");
+
   // Verificar se a transição para 'cirurgia_realizada' é permitida
   const canTransitionToSurgeryCompleted = (): { allowed: boolean; reason?: string } => {
     // Priorizar surgeryAppointment (tabela surgery_appointments) sobre order.procedureDate (legado)
@@ -226,6 +412,9 @@ export function StatusChangeModal({
 
   const surgeryTransitionCheck = canTransitionToSurgeryCompleted();
   
+  // Selecionar workflow baseado no tipo de procedimento (eletivo ou urgência)
+  const workflowSteps = getWorkflowSteps(order?.procedureType);
+  
   // Filtrar e modificar opções baseado nas validações
   const rawOptions = workflowSteps[currentStatus] || [];
   const availableOptions = rawOptions.map(option => {
@@ -243,6 +432,33 @@ export function StatusChangeModal({
     if (option.disabled) {
       return; // Não fazer nada se a opção estiver desabilitada
     }
+    
+    // Interceptar opções de cancelamento para mostrar modal de confirmação
+    if (option.key === 'cancelado') {
+      setCancelOptionLabel(option.label);
+      setCancelNotes("");
+      setShowCancelConfirmation(true);
+      return;
+    }
+    
+    // Interceptar opção de editar pedido
+    if (option.key === 'edit_order') {
+      if (onEditOrder && order) {
+        onEditOrder(order);
+      }
+      onClose();
+      return;
+    }
+
+    // Interceptar opção de gerar recurso - abrir modal de recurso ao invés de mudar status diretamente
+    if (option.key === 'aguardando_recurso') {
+      if (onAppeal) {
+        onAppeal(orderId);
+      }
+      onClose();
+      return;
+    }
+    
     if (option.requiresModal) {
       // Casos especiais que requerem modais adicionais
       if (option.key === 'autorizado_parcial' && onPartialApproval) {
@@ -255,6 +471,18 @@ export function StatusChangeModal({
       onStatusChange(orderId, option.key);
     }
     onClose();
+  };
+
+  const handleConfirmCancellation = () => {
+    onStatusChange(orderId, 'cancelado', cancelNotes || undefined);
+    setShowCancelConfirmation(false);
+    setCancelNotes("");
+    onClose();
+  };
+
+  const handleCancelCancellation = () => {
+    setShowCancelConfirmation(false);
+    setCancelNotes("");
   };
 
   // Caso especial para pedidos incompletos
@@ -395,10 +623,66 @@ export function StatusChangeModal({
             onClick={onClose}
             className="btn-medsync-light"
           >
-            Cancelar
+            Fechar
           </button>
         </div>
       </DialogContent>
+
+      {/* Modal de Confirmação de Cancelamento */}
+      <Dialog open={showCancelConfirmation} onOpenChange={setShowCancelConfirmation}>
+        <DialogContent className="bg-card border-border text-foreground max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-destructive flex items-center gap-2">
+              <X className="h-5 w-5" />
+              Confirmar {cancelOptionLabel}
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              Esta ação irá alterar o status do pedido #{orderId} para cancelado.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4 space-y-4">
+            <div className="flex items-start gap-3 p-3 bg-destructive/10 border border-destructive/30 rounded-lg">
+              <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-foreground">
+                Tem certeza que deseja continuar? Esta ação pode ser revertida posteriormente se necessário.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="cancel-notes" className="text-sm font-medium text-foreground">
+                Motivo do cancelamento (opcional)
+              </Label>
+              <Textarea
+                id="cancel-notes"
+                placeholder="Descreva o motivo do cancelamento..."
+                value={cancelNotes}
+                onChange={(e) => setCancelNotes(e.target.value)}
+                className="min-h-[100px] bg-background border-input text-foreground placeholder:text-muted-foreground resize-none"
+              />
+              <p className="text-xs text-muted-foreground">
+                Esta informação será registrada no histórico do pedido.
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex gap-3 pt-4 border-t border-border">
+            <Button 
+              variant="outline" 
+              onClick={handleCancelCancellation}
+              className="flex-1 border-border text-muted-foreground hover:bg-muted/50"
+            >
+              Voltar
+            </Button>
+            <Button 
+              onClick={handleConfirmCancellation}
+              className="flex-1 bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+            >
+              Confirmar Cancelamento
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }
