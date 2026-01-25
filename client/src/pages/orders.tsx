@@ -95,7 +95,16 @@ export default function Orders() {
   
   // Estados para controlar carregamento e erros
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isError, setIsError] = useState(false);
+  
+  // Estados para paginação
+  const [hasMore, setHasMore] = useState(true);
+  const [totalOrders, setTotalOrders] = useState(0);
+  const ORDERS_PER_PAGE = 10;
+  
+  // Estado para ordenação: 'createdAt' (padrão) ou 'updatedAt'
+  const [sortBy, setSortBy] = useState<'createdAt' | 'updatedAt'>('createdAt');
   
   // Estado para lista de hospitais (para o filtro)
   const [hospitalsList, setHospitalsList] = useState<any[]>([]);
@@ -284,18 +293,31 @@ export default function Orders() {
     }
   }, []);
   
-  // Função para buscar pedidos reais do banco de dados
-  const fetchOrders = async () => {
+  // Função para buscar pedidos reais do banco de dados com paginação
+  const fetchOrders = async (loadMore = false) => {
     if (!user) return;
     
     try {
-      setIsLoading(true);
+      if (loadMore) {
+        setIsLoadingMore(true);
+      } else {
+        setIsLoading(true);
+        setOrdersData([]); // Limpar ao recarregar
+      }
       setIsError(false);
       
-      // URL da API que implementamos com filtro por usuário
-      const url = isAdmin 
-        ? '/api/medical-orders' 
-        : `/api/medical-orders?userId=${user.id}`;
+      // Calcular offset para paginação
+      const currentOffset = loadMore ? ordersData.length : 0;
+      
+      // Construir URL com parâmetros de paginação e ordenação
+      const params = new URLSearchParams();
+      if (!isAdmin) params.append('userId', user.id.toString());
+      params.append('limit', ORDERS_PER_PAGE.toString());
+      params.append('offset', currentOffset.toString());
+      params.append('sortBy', sortBy);
+      params.append('sortOrder', 'desc');
+      
+      const url = `/api/medical-orders?${params.toString()}`;
         
       const response = await fetch(url);
       
@@ -305,38 +327,51 @@ export default function Orders() {
       
       const data = await response.json();
       
-      // Converter statusId para statusCode se necessário e ordenar pedidos
-      const processedData = Array.isArray(data) ? data.map(order => ({
+      // A API retorna { orders, pagination } quando há limit, ou array simples caso contrário
+      const ordersArray = Array.isArray(data) ? data : (data.orders || []);
+      const pagination = Array.isArray(data) 
+        ? { total: data.length, hasMore: false } 
+        : (data.pagination || { total: 0, hasMore: false });
+      
+      // Converter statusId para statusCode se necessário
+      const processedData = ordersArray.map((order: any) => ({
         ...order,
-        // Se o status não está presente ou é um ID numérico, converter usando statusIdToCode
         status: order.status && typeof order.status === 'string' ? order.status : 
                 statusIdToCode[order.statusId as keyof typeof statusIdToCode] || 'nao_especificado'
-      })).sort((a, b) => {
-        const dateA = new Date(a.createdAt || a.created_at || 0);
-        const dateB = new Date(b.createdAt || b.created_at || 0);
-        return dateB.getTime() - dateA.getTime(); // Mais recente primeiro
-      }) : [];
+      }));
       
-      setOrdersData(processedData);
-      setFilteredOrdersData(processedData);
+      // Atualizar estado de paginação
+      setHasMore(pagination.hasMore);
+      setTotalOrders(pagination.total);
       
-      // Extrair lista única de hospitais para o filtro
-      const uniqueHospitals = Array.from(
-        new Map(
-          data
-            .filter((order: any) => order.hospitalName)
-            .map((order: any) => [order.hospitalId, { id: order.hospitalId, name: order.hospitalName }])
-        ).values()
-      );
-      setHospitalsList(uniqueHospitals);
+      if (loadMore) {
+        // Adicionar aos existentes
+        setOrdersData(prev => [...prev, ...processedData]);
+      } else {
+        // Substituir
+        setOrdersData(processedData);
+      }
       
-      // Buscar agendamentos para pedidos com status "aceito", "autorizado_parcial", "autorizacao_pos" ou outros que podem ter agendamento
-      const ordersWithPossibleAppointments = processedData.filter(order => 
+      // Extrair lista única de hospitais para o filtro (apenas no primeiro carregamento)
+      if (!loadMore) {
+        // Buscar todos os hospitais do usuário para o filtro
+        try {
+          const hospitalsResponse = await fetch('/api/hospitals');
+          if (hospitalsResponse.ok) {
+            const hospitalsData = await hospitalsResponse.json();
+            setHospitalsList(hospitalsData);
+          }
+        } catch (e) {
+          console.log('Erro ao buscar hospitais para filtro');
+        }
+      }
+      
+      // Buscar agendamentos para pedidos que podem ter agendamento
+      const ordersWithPossibleAppointments = processedData.filter((order: any) => 
         ['aceito', 'autorizado_parcial', 'autorizacao_pos', 'cirurgia_realizada', 'recebido'].includes(order.status)
       );
       
-      // Buscar agendamentos para esses pedidos
-      ordersWithPossibleAppointments.forEach(order => {
+      ordersWithPossibleAppointments.forEach((order: any) => {
         fetchAppointmentForOrder(order.id);
       });
       
@@ -345,13 +380,19 @@ export default function Orders() {
       setIsError(true);
     } finally {
       setIsLoading(false);
+      setIsLoadingMore(false);
     }
   };
+  
+  // Função para carregar mais pedidos
+  const loadMoreOrders = () => {
+    fetchOrders(true);
+  };
 
-  // Buscar pedidos quando o componente carrega
+  // Buscar pedidos quando o componente carrega ou quando a ordenação muda
   useEffect(() => {
     fetchOrders();
-  }, [user, isAdmin]);
+  }, [user, isAdmin, sortBy]);
 
   // Função para buscar e atualizar apenas um pedido específico (otimização)
   const fetchOrder = async (orderId: number) => {
@@ -1160,7 +1201,7 @@ export default function Orders() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   {/* Campo de busca por paciente ou ID */}
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-sky-600" />
@@ -1272,6 +1313,16 @@ export default function Orders() {
                       </Command>
                     </PopoverContent>
                   </Popover>
+                  
+                  {/* Filtro de ordenação */}
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as 'createdAt' | 'updatedAt')}
+                    className="combobox-medsync w-full cursor-pointer"
+                  >
+                    <option value="createdAt">Ordenar por: Mais recentes</option>
+                    <option value="updatedAt">Ordenar por: Editados recentemente</option>
+                  </select>
                 </div>
                 
                 {/* Botão de limpar filtros quando há filtros ativos */}
@@ -1661,6 +1712,40 @@ export default function Orders() {
                       </CardContent>
                     </Card>
                   ))}
+                  
+                  {/* Botão Carregar Mais */}
+                  {hasMore && !isLoadingMore && (
+                    <div className="flex justify-center pt-4">
+                      <Button
+                        variant="outline"
+                        size="lg"
+                        onClick={loadMoreOrders}
+                        className="border-sky-300 text-sky-700 hover:bg-sky-100 px-8"
+                      >
+                        <ChevronDown className="h-4 w-4 mr-2" />
+                        Carregar mais pedidos ({ordersData.length} de {totalOrders})
+                      </Button>
+                    </div>
+                  )}
+                  
+                  {/* Loading de carregar mais */}
+                  {isLoadingMore && (
+                    <div className="flex justify-center pt-4">
+                      <div className="flex items-center gap-2 text-sky-600">
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                        <span>Carregando mais pedidos...</span>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Mensagem quando todos foram carregados */}
+                  {!hasMore && ordersData.length > 0 && (
+                    <div className="flex justify-center pt-4">
+                      <p className="text-sm text-muted-foreground">
+                        Todos os {totalOrders} pedidos foram carregados
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>

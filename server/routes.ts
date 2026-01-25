@@ -2420,12 +2420,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const status = req.query.status as string | undefined;
         const statusId = req.query.statusId ? parseInt(req.query.statusId as string) : undefined;
         
+        // Parâmetros de paginação
+        const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
+        const offset = req.query.offset ? parseInt(req.query.offset as string) : 0;
+        
+        // Parâmetros de ordenação: 'createdAt' (padrão) ou 'updatedAt'
+        const sortBy = (req.query.sortBy as string) || 'createdAt';
+        const sortOrder = (req.query.sortOrder as string) || 'desc';
+        
         console.log(`Buscando pedidos médicos com filtros:`, {
           userId,
           patientId,
           hospitalId,
           status,
-          statusId
+          statusId,
+          limit,
+          offset,
+          sortBy,
+          sortOrder
         });
         
         // Verificar se o usuário atual pode acessar esses dados
@@ -2448,13 +2460,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (status) filters.statusCode = status;
         if (statusId) filters.statusId = statusId;
         
+        // Adicionar parâmetros de paginação e ordenação aos filtros
+        if (limit) filters.limit = limit;
+        if (offset) filters.offset = offset;
+        filters.sortBy = sortBy;
+        filters.sortOrder = sortOrder;
+        
         // Se não for admin, sempre filtrar pelos pedidos do usuário atual
         if (!isAdmin && !userId) {
           filters.userId = currentUserId;
         }
         
-        // Buscar pedidos no banco de dados
-        let orders = await storage.getMedicalOrders(filters);
+        // Buscar pedidos no banco de dados (agora com paginação no SQL)
+        const { orders, total: totalCount } = await storage.getMedicalOrders(filters);
         
         // Enriquecer os dados com informações relacionadas
         const enrichedOrders = await Promise.all(
@@ -2644,8 +2662,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
           })
         );
         
-        console.log(`Encontrados ${enrichedOrders.length} pedidos médicos`);
-        res.json(enrichedOrders);
+        // Se não há limit especificado, retornar array simples para compatibilidade
+        if (!limit) {
+          console.log(`Encontrados ${enrichedOrders.length} pedidos médicos (sem paginação)`);
+          return res.json(enrichedOrders);
+        }
+        
+        // Calcular se há mais pedidos (paginação já foi aplicada no banco)
+        const hasMore = (offset + limit) < totalCount;
+        
+        console.log(`Encontrados ${totalCount} pedidos médicos no total, retornando ${enrichedOrders.length} (offset: ${offset}, limit: ${limit})`);
+        
+        // Retornar com metadados de paginação
+        res.json({
+          orders: enrichedOrders,
+          pagination: {
+            total: totalCount,
+            offset: offset,
+            limit: limit,
+            hasMore: hasMore
+          }
+        });
       } catch (error) {
         console.error("Erro ao buscar pedidos médicos:", error);
         res.status(500).json({ message: "Erro ao buscar pedidos médicos" });
