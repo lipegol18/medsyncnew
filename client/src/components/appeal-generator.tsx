@@ -636,10 +636,98 @@ export function AppealGenerator({
     try {
       setIsGeneratingAppealAI(true);
       
+      // Calcular idade do paciente
+      const calculateAge = (birthDate: string | null | undefined): number => {
+        if (!birthDate) return 0;
+        const today = new Date();
+        const birth = new Date(birthDate);
+        let age = today.getFullYear() - birth.getFullYear();
+        const monthDiff = today.getMonth() - birth.getMonth();
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+          age--;
+        }
+        return age;
+      };
+
+      // Mapear sexo do paciente
+      const mapSexo = (sex: string | null | undefined): string => {
+        if (!sex) return "Não informado";
+        const sexLower = sex.toLowerCase();
+        if (sexLower === 'm' || sexLower === 'masculino' || sexLower === 'male') return "Masculino";
+        if (sexLower === 'f' || sexLower === 'feminino' || sexLower === 'female') return "Feminino";
+        return sex;
+      };
+
+      // Mapear tipo de procedimento
+      const mapCondutaCirurgica = (procedureType: string | null | undefined): string => {
+        if (!procedureType) return "Não informado";
+        if (procedureType === 'eletiva') return "Eletiva";
+        if (procedureType === 'urgencia') return "Urgência";
+        if (procedureType === 'emergencia') return "Emergência";
+        return procedureType;
+      };
+
+      // Extrair TODOS os códigos CID do pedido (estrutura: cidCodes[].cid.code ou cidCodes[].code)
+      const codigosCid: string[] = appealOrderData?.cidCodes?.map((cidItem: any) => 
+        cidItem.cid?.code || cidItem.code || ''
+      ).filter((code: string) => code) || [];
+      
+      // Extrair TODOS os códigos CBHPM do pedido (estrutura: cbhpmProcedures[].procedureCode)
+      const codigosCbhpm: string[] = appealOrderData?.cbhpmProcedures?.map((proc: any) => 
+        proc.procedureCode || ''
+      ).filter((code: string) => code) || [];
+      
+      // Extrair TODOS os itens OPME do pedido (estrutura: opmeItems[].opmeTechnicalName)
+      const itensOpme: string[] = appealOrderData?.opmeItems?.map((item: any) => 
+        item.opmeTechnicalName || item.opmeCommercialName || ''
+      ).filter((name: string) => name) || [];
+
+      // Preparar anexos para a API (URLs públicas)
+      const anexosFormatados = appealAttachments
+        .filter(att => att.uploaded && att.url)
+        .map(att => ({
+          url: att.url,
+          nome: att.filename
+        }));
+
+      // Determinar a conduta clínica (surgicalApproaches) - ex: "Artroscopia"
+      const condutaClinica = appealOrderData?.surgicalApproaches?.[0]?.name || "Não informado";
+      
+      // Determinar o procedimento cirúrgico principal (surgicalProcedures) - ex: "Ombro - Reparo do manguito rotador"
+      const procedimentoPrincipal = appealOrderData?.surgicalProcedures?.[0]?.procedureName || 
+                                    appealOrderData?.procedureName || 
+                                    "Não informado";
+
+      // Construir payload completo para a API externa
+      const payload = {
+        // Campos obrigatórios
+        sexo_paciente: mapSexo(appealOrderData?.patient?.gender),
+        idade: calculateAge(appealOrderData?.patient?.birthDate),
+        indicacao_clinica: procedimentoPrincipal,
+        regiao_anatomica: appealOrderData?.anatomicalRegion?.name || "Não informado",
+        procedimento_cirurgico: condutaClinica,
+        
+        // Campos recomendados (contexto da glosa)
+        motivo_glosa: rejectionReason,
+        justificativa_enviada: appealOrderData?.clinicalJustification || "",
+        conduta_cirurgica: mapCondutaCirurgica(appealOrderData?.procedureType),
+        comorbidades_paciente: appealOrderData?.additionalNotes || "",
+        
+        // Arrays de códigos
+        codigos_cid: codigosCid,
+        codigos_cbhpm: codigosCbhpm,
+        itens_opme: itensOpme,
+        
+        // Anexos
+        anexos: anexosFormatados
+      };
+
+      console.log("📤 Enviando payload para API de glosa:", payload);
+      
       const response = await apiRequest(
         "/api/appeals/generate-with-ai",
         "POST",
-        { rejectionReason: rejectionReason }
+        payload
       );
 
       if (response.success && response.appealJustification) {

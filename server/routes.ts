@@ -2739,6 +2739,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const usersData = await db.select().from(users).where(eq(users.id, order.userId));
         const userData = usersData[0];
 
+        // Buscar região anatômica
+        let anatomicalRegionData = null;
+        if (order.anatomicalRegionId) {
+          const regionData = await db.select().from(anatomicalRegions).where(eq(anatomicalRegions.id, order.anatomicalRegionId));
+          anatomicalRegionData = regionData[0] || null;
+        }
+
         // Buscar CIDs relacionados ao pedido (incluindo associações de procedimento/conduta)
         let orderCids: any[] = [];
         try {
@@ -2833,6 +2840,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
           orderProcedures = procedureData;
         } catch (error) {
           console.log(`Erro ao buscar procedimentos cirúrgicos para pedido ${order.id}:`, error);
+        }
+
+        // Buscar itens OPME relacionados ao pedido
+        let orderOpmeItems: any[] = [];
+        try {
+          const opmeData = await db.select({
+            id: medicalOrderOpmeItems.id,
+            quantity: medicalOrderOpmeItems.quantity,
+            quantityApproved: medicalOrderOpmeItems.quantityApproved,
+            status: medicalOrderOpmeItems.status,
+            opmeItemId: opmeItems.id,
+            opmeTechnicalName: opmeItems.technicalName,
+            opmeCommercialName: opmeItems.commercialName,
+            opmeAnvisaNumber: opmeItems.anvisaRegistrationNumber,
+            surgicalApproachId: medicalOrderOpmeItems.surgicalApproachId,
+            surgicalProcedureId: medicalOrderOpmeItems.surgicalProcedureId
+          })
+          .from(medicalOrderOpmeItems)
+          .leftJoin(opmeItems, eq(medicalOrderOpmeItems.opmeItemId, opmeItems.id))
+          .where(eq(medicalOrderOpmeItems.orderId, order.id));
+          
+          orderOpmeItems = opmeData;
+        } catch (error) {
+          console.log(`Erro ao buscar itens OPME para pedido ${order.id}:`, error);
+        }
+
+        // Buscar procedimentos CBHPM relacionados ao pedido
+        let orderCbhpmProcedures: any[] = [];
+        try {
+          const cbhpmData = await db.select({
+            id: medicalOrderProcedures.id,
+            procedureId: procedures.id,
+            procedureCode: procedures.code,
+            procedureName: procedures.name,
+            quantityRequested: medicalOrderProcedures.quantityRequested,
+            quantityApproved: medicalOrderProcedures.quantityApproved,
+            status: medicalOrderProcedures.status,
+            surgicalApproachId: medicalOrderProcedures.surgicalApproachId,
+            surgicalProcedureId: medicalOrderProcedures.surgicalProcedureId
+          })
+          .from(medicalOrderProcedures)
+          .leftJoin(procedures, eq(medicalOrderProcedures.procedureId, procedures.id))
+          .where(eq(medicalOrderProcedures.orderId, order.id));
+          
+          orderCbhpmProcedures = cbhpmData;
+        } catch (error) {
+          console.log(`Erro ao buscar procedimentos CBHPM para pedido ${order.id}:`, error);
         }
 
         // Buscar agendamento cirúrgico para este pedido (se existir)
@@ -2935,14 +2989,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           cbhpmAdditionalNotes: order.cbhpmAdditionalNotes || "",
           opmeAdditionalNotes: order.opmeAdditionalNotes || "",
           supplierAdditionalNotes: order.supplierAdditionalNotes || "",
-          // ✅ REGIÃO ANATÔMICA: Incluir anatomicalRegionId para persistência visual
+          // ✅ REGIÃO ANATÔMICA: Incluir anatomicalRegionId e nome para persistência visual
           anatomicalRegionId: order.anatomicalRegionId || null,
+          anatomicalRegion: anatomicalRegionData ? {
+            id: anatomicalRegionData.id,
+            name: anatomicalRegionData.name
+          } : null,
           // **CRÍTICO**: Incluir attachments para correção do bug de finalização
           attachments: order.attachments || [],
           // ✅ DADOS COMPLETOS: patient e hospital para preview de recursos
           patient: patientData ? {
             fullName: patientData.fullName,
             birthDate: patientData.birthDate,
+            gender: patientData.gender,
             insuranceProviderId: patientData.insuranceProviderId,
             insuranceNumber: patientData.insuranceNumber,
             plan: patientData.plan
@@ -2954,7 +3013,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // ✅ AGENDAMENTO CIRÚRGICO: Incluir dados do agendamento para validação de status
           surgeryAppointment: surgeryAppointment,
           // ✅ PODE DESFAZER STATUS: Indica se existe um estado anterior diferente do atual
-          canUndoStatus: canUndoStatus
+          canUndoStatus: canUndoStatus,
+          // ✅ OPME e CBHPM: Arrays completos para geração de recurso
+          opmeItems: orderOpmeItems,
+          cbhpmProcedures: orderCbhpmProcedures
         };
 
         console.log(`✅ Pedido médico ${orderId} encontrado com statusColorClasses:`, !!enrichedOrder.statusColorClasses);
@@ -4745,7 +4807,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
-  // Endpoint para buscar paciente por ID (inclui endereço)
+  // Endpoint para buscar paciente por ID (inclui endereço e nome do convênio)
   app.get(
     "/api/patients/:id",
     
@@ -4767,8 +4829,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Buscar endereço principal do paciente
         const address = await storage.getPatientPrimaryAddress(patientId);
 
-        console.log(`Paciente encontrado: ${patient.fullName}`);
-        res.json({ ...patient, address: address || null });
+        // Buscar nome do convênio se houver insuranceProviderId
+        let insuranceProviderName: string | null = null;
+        if (patient.insuranceProviderId) {
+          const provider = await storage.getHealthInsuranceProvider(patient.insuranceProviderId);
+          insuranceProviderName = provider?.name || null;
+        }
+
+        console.log(`Paciente encontrado: ${patient.fullName}, Convênio: ${insuranceProviderName || 'Não informado'}`);
+        res.json({ 
+          ...patient, 
+          address: address || null,
+          insurance: insuranceProviderName // Campo usado pela visualização do pedido
+        });
       } catch (error) {
         console.error("Erro ao buscar paciente por ID:", error);
         res.status(500).json({ message: "Erro interno do servidor" });
@@ -8866,40 +8939,104 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Gerar recurso de glosa com IA (N8N Webhook)
+  // Gerar recurso de glosa com IA (API Externa MedSync Glosa Response)
   app.post("/api/appeals/generate-with-ai", async (req: Request, res: Response) => {
     try {
-      const { rejectionReason } = req.body;
+      const {
+        sexo_paciente,
+        idade,
+        indicacao_clinica,
+        regiao_anatomica,
+        procedimento_cirurgico,
+        motivo_glosa,
+        justificativa_enviada,
+        conduta_cirurgica,
+        comorbidades_paciente,
+        codigos_cid,
+        codigos_cbhpm,
+        itens_opme,
+        anexos
+      } = req.body;
 
-      // Validar campo obrigatório
-      if (!rejectionReason || rejectionReason.trim().length === 0) {
-        return res.status(400).json({ 
-          message: "Motivo da recusa é obrigatório para gerar recurso com IA" 
-        });
+      // Validar campos obrigatórios
+      const missingFields: string[] = [];
+      if (!sexo_paciente) missingFields.push("sexo_paciente");
+      if (idade === undefined || idade === null) missingFields.push("idade");
+      if (!indicacao_clinica) missingFields.push("indicacao_clinica");
+      if (!regiao_anatomica) missingFields.push("regiao_anatomica");
+      if (!procedimento_cirurgico) missingFields.push("procedimento_cirurgico");
+
+      if (missingFields.length > 0) {
+        console.log("⚠️ Campos obrigatórios faltando:", missingFields);
       }
 
       console.log("🤖 Gerando recurso de glosa com IA...");
-      console.log("📋 Motivo da glosa:", rejectionReason);
+      console.log("📋 Payload completo:", JSON.stringify(req.body, null, 2));
 
-      // Chamar webhook N8N para gerar recurso
-      const { sendToN8NWebhook } = await import("../shared/config.js");
-      
-      const response = await sendToN8NWebhook("generateGlossAppeal", {
-        motivo_glosa: rejectionReason.trim()
+      // URL da API externa MedSync Glosa Response
+      const API_URL = "https://hook-prod.iotninja.com.br/webhook/resposta-glosa";
+      const API_TOKEN = "Bearer f9a2b8e3-c1d5-4e7f-a6b0-9c8d7e6f5a4b";
+
+      // Construir payload para API externa
+      const payload = {
+        sexo_paciente: sexo_paciente || "Não informado",
+        idade: idade || 0,
+        indicacao_clinica: indicacao_clinica || "Não informado",
+        regiao_anatomica: regiao_anatomica || "Não informado",
+        procedimento_cirurgico: procedimento_cirurgico || "Não informado",
+        motivo_glosa: motivo_glosa || "",
+        justificativa_enviada: justificativa_enviada || "",
+        conduta_cirurgica: conduta_cirurgica || "Não informado",
+        comorbidades_paciente: comorbidades_paciente || "",
+        codigos_cid: codigos_cid || [],
+        codigos_cbhpm: codigos_cbhpm || [],
+        itens_opme: itens_opme || [],
+        anexos: anexos || []
+      };
+
+      console.log("📤 Enviando para API externa:", API_URL);
+
+      const response = await fetch(API_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": API_TOKEN
+        },
+        body: JSON.stringify(payload)
       });
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error("❌ Erro do webhook N8N:", errorText);
-        throw new Error(`Webhook retornou status ${response.status}: ${errorText}`);
+        console.error("❌ Erro da API externa:", response.status, errorText);
+        
+        try {
+          const errorJson = JSON.parse(errorText);
+          return res.status(response.status).json({
+            message: errorJson.message || "Erro da API externa",
+            error: errorJson
+          });
+        } catch {
+          throw new Error(`API externa retornou status ${response.status}: ${errorText}`);
+        }
       }
 
       const result = await response.json();
       console.log("✅ Recurso de glosa gerado com sucesso pela IA");
+      console.log("📥 Resposta da API:", JSON.stringify(result, null, 2));
+      
+      const appealText = result.output || 
+                         result.output_recurso_redigido || 
+                         result.recurso_redigido || 
+                         result.resposta || 
+                         result.justificativa || 
+                         "Recurso gerado pela IA";
       
       res.json({ 
         success: true,
-        appealJustification: result.motivo_glosa || result.resposta || result.justificativa || "Recurso gerado pela IA",
+        appealJustification: appealText,
+        executionId: result.execution_id,
+        casosSimilares: result.output_casos_similares,
+        resumoDocumentos: result.output_resumo_documentos,
         data: result
       });
 

@@ -601,6 +601,7 @@ interface OrderPDFDocumentProps {
   attachments?: any[];
   pageBreakPositions?: number[];
   pageBreakConfigs?: PageBreakConfig[];
+  forcedPageBreaks?: string[]; // IDs dos blocos que devem iniciar nova página
 }
 
 export const OrderPDFDocument: React.FC<OrderPDFDocumentProps> = ({
@@ -615,12 +616,18 @@ export const OrderPDFDocument: React.FC<OrderPDFDocumentProps> = ({
   attachments = [],
   pageBreakPositions = [],
   pageBreakConfigs = [],
+  forcedPageBreaks = [],
 }) => {
-  const hasManualBreaks = pageBreakPositions.length > 0 || pageBreakConfigs.length > 0;
+  const hasManualBreaks = pageBreakPositions.length > 0 || pageBreakConfigs.length > 0 || forcedPageBreaks.length > 0;
   
   const shouldBreakBefore = (sectionIndex: number): boolean => {
     if (pageBreakPositions.includes(sectionIndex)) return true;
     return pageBreakConfigs.some(c => c.sectionIndex === sectionIndex);
+  };
+  
+  // Verificar se um bloco deve iniciar nova página baseado no ID
+  const shouldBreakBeforeBlock = (blockId: string): boolean => {
+    return forcedPageBreaks.includes(blockId);
   };
   
   const shouldBreakBeforeJustificationLine = (lineIndex: number): boolean => {
@@ -680,9 +687,9 @@ export const OrderPDFDocument: React.FC<OrderPDFDocumentProps> = ({
         <PageHeader />
         <PageFooter />
 
-        {/* Seção de Dados do Paciente - Seção 0 */}
+        {/* Seção de Dados do Paciente - Bloco patient-data */}
         {patientData && (
-          <View style={styles.patientSection} break={shouldBreakBefore(0)}>
+          <View style={styles.patientSection} break={shouldBreakBefore(0) || shouldBreakBeforeBlock('patient-data')}>
             {/* Título "Dados do Paciente" com linha separatória dentro da caixa */}
             <View style={styles.patientTitleSection}>
               <Text style={styles.patientTitle}>Dados do Paciente</Text>
@@ -698,37 +705,37 @@ export const OrderPDFDocument: React.FC<OrderPDFDocumentProps> = ({
             <View style={styles.patientDetails}>
               <View style={styles.patientColumn}>
                 <Text style={styles.patientInfoText}>
-                  <Text style={styles.bold}>CPF:</Text> {patientData.cpf ? formatCPF(patientData.cpf) : 'Não informado'}
+                  <Text style={styles.bold}>CPF:</Text> {patientData.cpf ? formatCPF(patientData.cpf) : ''}
                 </Text>
                 <Text style={styles.patientInfoText}>
-                  <Text style={styles.bold}>Data de Nascimento:</Text> {patientData.birthDate ? formatDate(patientData.birthDate) : 'Não informado'}
+                  <Text style={styles.bold}>Data de Nascimento:</Text> {patientData.birthDate ? formatDate(patientData.birthDate) : ''}
                 </Text>
                 <Text style={styles.patientInfoText}>
-                  <Text style={styles.bold}>Idade:</Text> {patientData.birthDate ? new Date().getFullYear() - new Date(patientData.birthDate).getFullYear() : 'N/A'} anos
+                  <Text style={styles.bold}>Idade:</Text> {patientData.birthDate ? `${new Date().getFullYear() - new Date(patientData.birthDate).getFullYear()} anos` : ''}
                 </Text>
               </View>
               <View style={styles.patientColumn}>
                 <Text style={styles.patientInfoText}>
-                  <Text style={styles.bold}>Plano de Saúde:</Text> {patientData.insurance || 'Não informado'}
+                  <Text style={styles.bold}>Plano de Saúde:</Text> {patientData.insurance || ''}
                 </Text>
                 <Text style={styles.patientInfoText}>
-                  <Text style={styles.bold}>Número da Carteirinha:</Text> {patientData.insuranceNumber || 'Não informado'}
+                  <Text style={styles.bold}>Número da Carteirinha:</Text> {patientData.insuranceNumber || ''}
                 </Text>
                 <Text style={styles.patientInfoText}>
-                  <Text style={styles.bold}>Tipo do Plano:</Text> {patientData.plan || 'Não informado'}
+                  <Text style={styles.bold}>Tipo do Plano:</Text> {patientData.plan || ''}
                 </Text>
               </View>
             </View>
           </View>
         )}
 
-        {/* Título do documento - Seção 1 */}
-        <Text style={styles.documentTitle} break={shouldBreakBefore(1)}>
+        {/* Título do documento - Bloco title */}
+        <Text style={styles.documentTitle} break={shouldBreakBefore(1) || shouldBreakBeforeBlock('title')}>
           SOLICITAÇÃO DE PROCEDIMENTO CIRÚRGICO
         </Text>
 
-        {/* Justificativa clínica com suporte a Markdown - Seção 2 - permite quebra de página */}
-        <View style={styles.justificationBox} wrap={true} break={shouldBreakBefore(2)}>
+        {/* Justificativa clínica com suporte a Markdown - Bloco justification */}
+        <View style={styles.justificationBox} wrap={true} break={shouldBreakBefore(2) || shouldBreakBeforeBlock('justification')}>
           {orderData?.clinicalJustification ? (
             parseMarkdownToPdf(orderData.clinicalJustification).map((line, lineIndex) => {
               const shouldBreakHere = shouldBreakBeforeJustificationLine(lineIndex);
@@ -830,14 +837,14 @@ export const OrderPDFDocument: React.FC<OrderPDFDocumentProps> = ({
           )}
         </View>
 
-        {/* Informações do procedimento - Seção 3 - NÃO pode quebrar entre páginas */}
-        <View style={styles.procedureInfoRow} wrap={false} break={shouldBreakBefore(3)}>
+        {/* Informações do procedimento - Bloco procedure-info */}
+        <View style={styles.procedureInfoRow} wrap={false} break={shouldBreakBefore(3) || shouldBreakBeforeBlock('procedure-info')}>
           <View style={styles.procedureInfoColumn}>
             <Text style={styles.sectionHeader}>Caráter do Procedimento:</Text>
             <Text style={styles.procedureInfoText}>
               {orderData?.procedureType === 'eletiva' ? 'Eletivo' : 
                orderData?.procedureType === 'urgencia' ? 'Urgência' : 
-               orderData?.procedureType === 'emergencia' ? 'Emergência' : 'Não especificado'}
+               orderData?.procedureType === 'emergencia' ? 'Emergência' : ''}
             </Text>
           </View>
           <View style={styles.procedureInfoColumn}>
@@ -845,7 +852,8 @@ export const OrderPDFDocument: React.FC<OrderPDFDocumentProps> = ({
             <Text style={styles.procedureInfoText}>
               {orderData?.procedureLaterality === 'direito' ? 'Direito' :
                orderData?.procedureLaterality === 'esquerdo' ? 'Esquerdo' :
-               orderData?.procedureLaterality === 'bilateral' ? 'Bilateral' : 'Não especificado'}
+               orderData?.procedureLaterality === 'bilateral' ? 'Bilateral' :
+               orderData?.procedureLaterality === 'nao_se_aplica' ? 'Não se aplica' : ''}
             </Text>
           </View>
         </View>
@@ -1281,8 +1289,20 @@ export const OrderPDFDocument: React.FC<OrderPDFDocumentProps> = ({
               );
             };
 
+            // Gerar ID do bloco para quebra forçada (compatível com preview V2)
+            // Preview V2 usa key no formato "${procedureId}|${approachId}" ou "general"
+            // Verificar quebras forçadas por tipo de seção dentro do grupo
+            const groupHeaderBlockId = `group-header-${key}`;
+            const cidsBlockId = `cids-${key}`;
+            const cbhpmBlockId = `cbhpm-${key}`;
+            const opmeBlockId = `opme-${key}`;
+            const suppliersBlockId = `suppliers-${key}`;
+            
+            // Verificar se algum bloco do grupo tem quebra forçada (o primeiro a aparecer indica quebra no grupo)
+            const shouldBreakGroup = shouldBreakBeforeBlock(groupHeaderBlockId) || shouldBreakBeforeBlock(cidsBlockId);
+            
             return (
-              <View key={key} style={groupIndex > 0 ? { marginTop: 10, paddingTop: 8, borderTopWidth: 0.5, borderTopColor: '#e5e7eb' } : {}} break={shouldBreakBefore(groupSectionIndex)}>
+              <View key={key} style={groupIndex > 0 ? { marginTop: 10, paddingTop: 8, borderTopWidth: 0.5, borderTopColor: '#e5e7eb' } : {}} break={shouldBreakBefore(groupSectionIndex) || shouldBreakGroup}>
                 {/* Agrupa título + primeira seção para não ficarem separados em páginas diferentes */}
                 {showHeader && hasCids && (
                   <View wrap={false} minPresenceAhead={180}>
@@ -1469,8 +1489,8 @@ export const OrderPDFDocument: React.FC<OrderPDFDocumentProps> = ({
           );
         })()}
 
-        {/* BLOCO DE ASSINATURA - minPresenceAhead nas seções anteriores garante conteúdo junto */}
-        <View wrap={false}>
+        {/* BLOCO DE ASSINATURA - Bloco signature */}
+        <View wrap={false} break={shouldBreakBeforeBlock('signature')}>
           {/* Seção de assinatura */}
           <View style={styles.signatureSection}>
             {/* Data */}
