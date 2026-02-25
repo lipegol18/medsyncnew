@@ -129,6 +129,7 @@ import { LoadingLogo } from "@/components/loading-logo";
 import { MarkdownViewer } from "@/components/markdown-editor";
 import { OrderPreview } from "@/components/order-preview";
 import { OrderPreviewV2 } from "@/components/order-preview_v2";
+import { OrderPreviewV3 } from "@/components/order-preview_v3";
 
 const USE_PAGINATED_PREVIEW = true;
 
@@ -4188,40 +4189,23 @@ export default function CreateOrder() {
 
             {currentStep === 4 && (
               <div className="p-3 sm:p-6" data-testid="order-step-4">
-                {USE_PAGINATED_PREVIEW ? (
-                  <OrderPreviewV2
-                    selectedPatient={selectedPatient}
-                    selectedHospital={selectedHospital}
-                    user={user}
-                    clinicalJustification={clinicalJustification}
-                    procedureType={procedureType}
-                    procedureLaterality={procedureLaterality}
-                    multipleCids={multipleCids}
-                    secondaryProcedures={secondaryProcedures}
-                    selectedOpmeItems={selectedOpmeItems}
-                    supplierDetails={supplierDetails}
-                    cbhpmAdditionalNotes={cbhpmAdditionalNotes}
-                    opmeAdditionalNotes={opmeAdditionalNotes}
-                    supplierAdditionalNotes={supplierAdditionalNotes}
-                    onForcedPageBreaksChange={setForcedPageBreaks}
-                  />
-                ) : (
-                  <OrderPreview
-                    selectedPatient={selectedPatient}
-                    selectedHospital={selectedHospital}
-                    user={user}
-                    clinicalJustification={clinicalJustification}
-                    procedureType={procedureType}
-                    procedureLaterality={procedureLaterality}
-                    multipleCids={multipleCids}
-                    secondaryProcedures={secondaryProcedures}
-                    selectedOpmeItems={selectedOpmeItems}
-                    supplierDetails={supplierDetails}
-                    cbhpmAdditionalNotes={cbhpmAdditionalNotes}
-                    opmeAdditionalNotes={opmeAdditionalNotes}
-                    supplierAdditionalNotes={supplierAdditionalNotes}
-                  />
-                )}
+                <OrderPreviewV3
+                  orderId={orderId}
+                  selectedPatient={selectedPatient}
+                  selectedHospital={selectedHospital}
+                  user={user}
+                  clinicalJustification={clinicalJustification}
+                  procedureType={procedureType}
+                  procedureLaterality={procedureLaterality}
+                  multipleCids={multipleCids}
+                  secondaryProcedures={secondaryProcedures}
+                  selectedOpmeItems={selectedOpmeItems}
+                  supplierDetails={supplierDetails}
+                  cbhpmAdditionalNotes={cbhpmAdditionalNotes}
+                  opmeAdditionalNotes={opmeAdditionalNotes}
+                  supplierAdditionalNotes={supplierAdditionalNotes}
+                  onForcedPageBreaksChange={setForcedPageBreaks}
+                />
               </div>
             )}
 
