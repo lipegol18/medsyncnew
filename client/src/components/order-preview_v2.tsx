@@ -111,11 +111,12 @@ export interface OrderPreviewV2Props {
   cbhpmAdditionalNotes?: string;
   opmeAdditionalNotes?: string;
   supplierAdditionalNotes?: string;
+  orderId?: number;
   onForcedPageBreaksChange?: (breaks: Set<string>) => void;
 }
 
 const HEADER_HEIGHT_PX = 107; // PDF usa 80pt = ~107px
-const FOOTER_HEIGHT_PX = 60;
+const FOOTER_HEIGHT_PT = 40; // igual ao PDF: fixedFooter height: 40pt
 // A4 PDF: 842 pontos total, 702 pontos de conteúdo (80 topo + 60 base)
 // Proporção conteúdo = 702/842 = 83.4%
 // A4 em pixels (96dpi): 297mm = 1123px, 83.4% = ~936px
@@ -140,6 +141,7 @@ interface ContentBlock {
     | "title"
     | "justification-header"
     | "justification-paragraph"
+    | "justification-spacer"
     | "justification-references"
     | "procedure-info"
     | "group-header"
@@ -167,6 +169,7 @@ export function OrderPreviewV2({
   cbhpmAdditionalNotes,
   opmeAdditionalNotes,
   supplierAdditionalNotes,
+  orderId,
   onForcedPageBreaksChange,
 }: OrderPreviewV2Props) {
   const [currentPage, setCurrentPage] = useState(1);
@@ -413,8 +416,11 @@ export function OrderPreviewV2({
         estimatedHeight: 100,
         content: (
           <div
-            className="mb-5 p-3 bg-[#f8fafc] rounded border border-[#e2e8f0]"
-            style={{ fontFamily: "Helvetica, Arial, sans-serif" }}
+            className="mb-5 bg-[#f8fafc] rounded border border-[#e2e8f0]"
+            style={{
+              fontFamily: "Helvetica, Arial, sans-serif",
+              padding: "11px",
+            }}
           >
             <h3
               className="font-bold mb-2 border-b border-[#d1d5db] pb-2"
@@ -475,11 +481,13 @@ export function OrderPreviewV2({
       estimatedHeight: 30,
       content: (
         <h2
-          className="font-bold text-center pb-1 mb-2 uppercase"
+          className="font-bold text-center uppercase"
           style={{
             fontSize: "13pt",
             color: "#1e3a8a",
             fontFamily: "Helvetica, Arial, sans-serif",
+            marginBottom: "7px",
+            paddingBottom: "8pt",
           }}
         >
           SOLICITAÇÃO DE PROCEDIMENTO CIRÚRGICO
@@ -511,7 +519,8 @@ export function OrderPreviewV2({
               fontFamily: "Helvetica, Arial, sans-serif",
               paddingLeft: "5pt",
               paddingRight: "5pt",
-              marginBottom: "8px",
+              lineHeight: "1",
+              marginBottom: "9px",
             }}
           >
             INDICAÇÃO CLÍNICA:
@@ -523,19 +532,25 @@ export function OrderPreviewV2({
       // (mesmo comportamento do PDF que quebra parágrafos entre páginas)
       const allLines = mainText.split(/\n/).map((l) => l.replace(/\s+$/, ""));
       let lineBlockIndex = 0;
+      let prevWasBlank = false;
 
       allLines.forEach((line, idx) => {
         const isBlankLine = line.trim().length === 0;
 
         if (isBlankLine) {
-          // Espaço entre parágrafos
-          blocks.push({
-            id: `justification-line-${lineBlockIndex}`,
-            type: "justification-paragraph",
-            estimatedHeight: 10,
-            content: <div style={{ height: "10px" }} />,
-          });
+          // Colapsa linhas em branco consecutivas num único spacer (igual ao PDF: split /\n\s*\n/)
+          // PDF: Text marginBottom 15pt + View marginBottom 8pt = ~31px; HTML: 8px (marginBottom do texto) + 23px = 31px
+          if (!prevWasBlank) {
+            blocks.push({
+              id: `justification-line-${lineBlockIndex}`,
+              type: "justification-spacer",
+              estimatedHeight: 0,
+              content: <div style={{ height: "0" }} />,
+            });
+          }
+          prevWasBlank = true;
         } else {
+          prevWasBlank = false;
           const lineWraps = Math.ceil(line.length / 95);
           const lineHeight = lineWraps * 14;
           blocks.push({
@@ -548,12 +563,14 @@ export function OrderPreviewV2({
                 style={{
                   fontSize: "9pt",
                   color: "#000000",
-                  lineHeight: 1.4,
-                  letterSpacing: "0.2pt",
+                  lineHeight: 1.54,
                   fontFamily: "Helvetica, Arial, sans-serif",
-                  paddingLeft: "8pt",
-                  paddingRight: "8pt",
-                  marginBottom: "6pt",
+                  paddingLeft: "5pt",
+                  paddingRight: "5pt",
+                  marginBottom: "4pt",
+                  overflowWrap: "break-word",
+                  wordBreak: "break-word",
+                  wordSpacing: "-1px",
                 }}
               >
                 {line}
@@ -619,17 +636,19 @@ export function OrderPreviewV2({
       estimatedHeight: 60,
       content: (
         <div
-          className="flex mb-3 gap-5"
+          className="flex gap-5"
           style={{
             fontFamily: "Helvetica, Arial, sans-serif",
             paddingLeft: "5pt",
             paddingRight: "5pt",
+            marginTop: "18pt",
+            marginBottom: "8pt",
           }}
         >
           <div className="flex-1">
             <p
-              className="font-bold mb-1"
-              style={{ fontSize: "9pt", color: "#374151" }}
+              className="font-bold"
+              style={{ fontSize: "9pt", color: "#374151", marginBottom: "4pt" }}
             >
               Caráter do Procedimento:
             </p>
@@ -701,11 +720,11 @@ export function OrderPreviewV2({
           estimatedHeight: 30 + group.cids.length * 20,
           content: (
             <div
-              className="mb-3"
               style={{
                 fontFamily: "Helvetica, Arial, sans-serif",
                 paddingLeft: "5pt",
                 paddingRight: "5pt",
+                marginBottom: "8pt",
               }}
             >
               <p
@@ -745,11 +764,11 @@ export function OrderPreviewV2({
           estimatedHeight: 30 + sortedProcs.length * 16 + (cbhpmNote ? 40 : 0),
           content: (
             <div
-              className="mb-3"
               style={{
                 fontFamily: "Helvetica, Arial, sans-serif",
                 paddingLeft: "5pt",
                 paddingRight: "5pt",
+                marginBottom: "8pt",
               }}
             >
               <p
@@ -809,16 +828,20 @@ export function OrderPreviewV2({
             30 + group.opmeItems.length * 16 + (opmeNote ? 40 : 0),
           content: (
             <div
-              className="mb-3"
               style={{
                 fontFamily: "Helvetica, Arial, sans-serif",
                 paddingLeft: "5pt",
                 paddingRight: "5pt",
+                marginBottom: "5pt",
               }}
             >
               <p
-                className="font-bold mb-1"
-                style={{ fontSize: "9pt", color: "#374151" }}
+                className="font-bold "
+                style={{
+                  fontSize: "9pt",
+                  color: "#374151",
+                  marginBottom: "1pt",
+                }}
               >
                 Lista de Materiais Necessários:
               </p>
@@ -872,11 +895,11 @@ export function OrderPreviewV2({
             30 + group.suppliers.length * 16 + (supplierNote ? 40 : 0),
           content: (
             <div
-              className="mb-3"
               style={{
                 fontFamily: "Helvetica, Arial, sans-serif",
                 paddingLeft: "5pt",
                 paddingRight: "5pt",
+                marginBottom: "16px",
               }}
             >
               <p
@@ -1005,11 +1028,11 @@ export function OrderPreviewV2({
       content: (
         <div
           style={{
-            marginTop: "30px",
+            marginTop: "40px",
             fontFamily: "Helvetica, Arial, sans-serif",
           }}
         >
-          <div className="text-right" style={{ marginBottom: "25px" }}>
+          <div className="text-right" style={{ marginBottom: "33px" }}>
             <p style={{ fontSize: "9pt", color: "#1f2937" }}>
               {selectedHospital?.name?.includes("Niterói")
                 ? "Niterói"
@@ -1038,7 +1061,7 @@ export function OrderPreviewV2({
               <>
                 <div
                   className="border-t border-gray-500"
-                  style={{ width: "150px", marginBottom: "4px" }}
+                  style={{ width: "200px", marginBottom: "4px" }}
                 ></div>
                 <p
                   className="font-bold"
@@ -1108,12 +1131,19 @@ export function OrderPreviewV2({
       if (!measurementRef.current) return;
 
       const newHeights = new Map<string, number>();
-      const elements =
-        measurementRef.current.querySelectorAll("[data-block-id]");
+      const elements = Array.from(
+        measurementRef.current.querySelectorAll("[data-block-id]"),
+      ) as HTMLElement[];
 
-      elements.forEach((el) => {
+      elements.forEach((el, index) => {
         const blockId = el.getAttribute("data-block-id");
-        if (blockId) {
+        if (!blockId) return;
+        if (index < elements.length - 1) {
+          // Diferença de offsetTop entre elementos consecutivos captura
+          // a altura real do bloco incluindo todas as margens CSS
+          newHeights.set(blockId, elements[index + 1].offsetTop - el.offsetTop);
+        } else {
+          // Último bloco: usa getBoundingClientRect (sem margem inferior necessária)
           newHeights.set(blockId, el.getBoundingClientRect().height);
         }
       });
@@ -1194,15 +1224,30 @@ export function OrderPreviewV2({
         inJustification = true;
         continue;
       }
-      if (inJustification && block.type === "justification-paragraph") {
-        if (firstTextLineIndex === -1 && block.estimatedHeight > 10) {
+      if (
+        inJustification &&
+        (block.type === "justification-paragraph" ||
+          block.type === "justification-spacer")
+      ) {
+        if (
+          firstTextLineIndex === -1 &&
+          block.estimatedHeight > 10 &&
+          block.type !== "justification-spacer"
+        ) {
           firstTextLineIndex = i;
-        } else if (firstTextLineIndex >= 0) {
+        } else if (
+          firstTextLineIndex >= 0 &&
+          block.type !== "justification-spacer"
+        ) {
           return i;
         }
         continue;
       }
-      if (inJustification && block.type !== "justification-paragraph") {
+      if (
+        inJustification &&
+        block.type !== "justification-paragraph" &&
+        block.type !== "justification-spacer"
+      ) {
         return i;
       }
     }
@@ -1243,24 +1288,24 @@ export function OrderPreviewV2({
 
   const Header = () => (
     <div
-      className="flex items-center justify-between p-3 border-b border-gray-200"
+      className="flex items-center justify-between overflow-hidden"
       style={{
         height: `${HEADER_HEIGHT_PX}px`,
         fontFamily: "Helvetica, Arial, sans-serif",
-        marginTop: "30px",
+        marginTop: "20px",
       }}
     >
-      {/* Logo Hospital: PDF usa 80pt x 60pt = ~107px x 80px - centralizado verticalmente */}
+      {/* Logo Hospital: PDF usa 80pt x 60pt → 107px x 80px na tela (794px/595pt=1.334) */}
       <div
         className="flex items-center justify-start overflow-hidden"
-        style={{ width: "137px", height: "80px", marginLeft: "24px" }}
+        style={{ width: "107px", height: "80px", marginLeft: "24px" }}
       >
         {selectedHospital?.logoUrl ? (
           <img
             src={selectedHospital.logoUrl}
             alt={`Logo do ${selectedHospital.name}`}
             style={{
-              maxWidth: "137px",
+              maxWidth: "107px",
               maxHeight: "80px",
               objectFit: "contain",
             }}
@@ -1277,17 +1322,17 @@ export function OrderPreviewV2({
           </div>
         )}
       </div>
-      {/* Logo Médico: PDF usa 160pt x 120pt = ~213px x 160px - centralizado verticalmente */}
+      {/* Logo Médico: PDF usa 192pt x 144pt → 256px x 192px na tela (794px/595pt=1.334) */}
       <div
         className="flex items-center justify-end overflow-visible"
-        style={{ width: "286px", height: "96px", marginRight: "24px" }}
+        style={{ width: "256px", height: "96px", marginRight: "24px" }}
       >
         {user?.logoUrl && (
           <img
             src={user.logoUrl}
             alt="Logo do Médico"
             style={{
-              maxWidth: "286px",
+              maxWidth: "256px",
               maxHeight: "192px",
               objectFit: "contain",
             }}
@@ -1302,21 +1347,47 @@ export function OrderPreviewV2({
 
   const Footer = ({ pageNum, total }: { pageNum: number; total: number }) => (
     <div
-      className="flex items-center justify-between px-4 border-t border-gray-200"
       style={{
-        height: `${FOOTER_HEIGHT_PX}px`,
+        height: `${FOOTER_HEIGHT_PT}pt`,
+        paddingTop: "8pt",
+        paddingLeft: "0pt",
+        paddingRight: "0pt",
+        borderTop: "1pt solid #e0e0e0",
+        display: "flex",
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
         fontFamily: "Helvetica, Arial, sans-serif",
+        backgroundColor: "#ffffff",
       }}
     >
-      <div className="flex items-center">
-        <img src={MedSyncLogo} alt="Logo MedSync" className="h-4 mr-2" />
+      <div
+        style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "row",
+          alignItems: "center",
+          gap: "4pt",
+        }}
+      >
+        <img
+          src={MedSyncLogo}
+          alt="Logo MedSync"
+          style={{ height: "13pt", objectFit: "contain" }}
+        />
+        <span style={{ fontSize: "8pt", color: "#6b7280" }}>v2.5.3</span>
+      </div>
+      <div style={{ flex: 1, textAlign: "center" }}>
         <span style={{ fontSize: "8pt", color: "#6b7280" }}>
-          MedSync v2.5.3
+          {orderId ? `Pedido #${orderId}` : ""} - Gerado em{" "}
+          {new Date().toLocaleDateString("pt-BR")}
         </span>
       </div>
-      <span style={{ fontSize: "8pt", color: "#6b7280" }}>
-        Página {pageNum} de {total}
-      </span>
+      <div style={{ flex: 1, textAlign: "right" }}>
+        <span style={{ fontSize: "8pt", color: "#6b7280" }}>
+          Página {pageNum} de {total}
+        </span>
+      </div>
     </div>
   );
 
@@ -1446,7 +1517,6 @@ export function OrderPreviewV2({
               height: `${PAGE_CONTENT_HEIGHT_PX}px`,
               paddingLeft: "20pt",
               paddingRight: "20pt",
-              paddingTop: "12px",
               paddingBottom: "12px",
             }}
           >
@@ -1462,6 +1532,27 @@ export function OrderPreviewV2({
                 blockIndex < currentPageBlocks.length - 1
                   ? currentPageBlocks[blockIndex + 1]
                   : null;
+
+              // Se nextBlock é um spacer, encontra o próximo bloco não-spacer
+              // para ser o alvo real da quebra de página (suporte ao Enter no richtext)
+              const breakTargetBlock =
+                nextBlock?.type === "justification-spacer"
+                  ? (() => {
+                      for (
+                        let k = blockIndex + 2;
+                        k < currentPageBlocks.length;
+                        k++
+                      ) {
+                        if (
+                          currentPageBlocks[k].type !== "justification-spacer"
+                        ) {
+                          return currentPageBlocks[k];
+                        }
+                      }
+                      return null;
+                    })()
+                  : nextBlock;
+
               const nextBlockIsFixed =
                 nextBlock &&
                 (nextBlock.type === "patient-data" ||
@@ -1470,17 +1561,30 @@ export function OrderPreviewV2({
               const nextGlobalIndex = nextBlock
                 ? contentBlocks.findIndex((b) => b.id === nextBlock.id)
                 : -1;
-              const nextBlockHasBreak = nextBlock
-                ? forcedPageBreaks.has(nextBlock.id)
+              const breakTargetGlobalIndex = breakTargetBlock
+                ? contentBlocks.findIndex((b) => b.id === breakTargetBlock.id)
+                : nextGlobalIndex;
+              const nextBlockHasBreak = breakTargetBlock
+                ? forcedPageBreaks.has(breakTargetBlock.id)
                 : false;
               const nextBlockInProtectedZone =
-                nextGlobalIndex < firstEligibleBreakIndex;
+                breakTargetGlobalIndex < firstEligibleBreakIndex;
               const showDividerAfter =
                 nextBlock &&
+                breakTargetBlock &&
                 !nextBlockIsFixed &&
                 nextGlobalIndex > 0 &&
                 !nextBlockHasBreak &&
-                !nextBlockInProtectedZone;
+                !nextBlockInProtectedZone &&
+                block.type !== "justification-spacer" &&
+                !(
+                  block.type === "justification-paragraph" &&
+                  breakTargetBlock.type === "procedure-info"
+                ) &&
+                !(
+                  block.type === "justification-references" &&
+                  breakTargetBlock.type === "procedure-info"
+                );
 
               return (
                 <div
@@ -1508,29 +1612,43 @@ export function OrderPreviewV2({
 
                   {block.content}
 
-                  {showDividerAfter && (
-                    <div
-                      className="relative my-0.5 group/divider"
-                      onMouseEnter={() => setHoverDividerId(nextBlock.id)}
-                      onMouseLeave={() => setHoverDividerId(null)}
-                    >
-                      {hoverDividerId === nextBlock.id ? (
-                        <button
-                          onClick={() => togglePageBreak(nextBlock.id)}
-                          className="w-full flex items-center gap-2 py-1 cursor-pointer group/btn"
+                  {showDividerAfter &&
+                    (() => {
+                      const isEnterBased =
+                        nextBlock?.type === "justification-spacer";
+                      return (
+                        <div
+                          className={`relative ${isEnterBased ? "divider-paragraph-enter" : "divider-paragraph-shift"}`}
+                          style={
+                            isEnterBased
+                              ? { marginTop: "1.5pt", marginBottom: "1.5pt" }
+                              : { marginTop: "-5pt", marginBottom: "-5pt" }
+                          }
+                          onMouseEnter={() =>
+                            setHoverDividerId(breakTargetBlock!.id)
+                          }
+                          onMouseLeave={() => setHoverDividerId(null)}
                         >
-                          <div className="flex-1 border-t-2 border-dashed border-blue-300 group-hover/btn:border-blue-400 transition-colors" />
-                          <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-blue-600 text-xs font-medium hover:bg-blue-100 hover:border-blue-300 transition-colors whitespace-nowrap">
-                            <Scissors className="h-3 w-3" />
-                            Inserir quebra de página
-                          </span>
-                          <div className="flex-1 border-t-2 border-dashed border-blue-300 group-hover/btn:border-blue-400 transition-colors" />
-                        </button>
-                      ) : (
-                        <div className="h-2" />
-                      )}
-                    </div>
-                  )}
+                          {hoverDividerId === breakTargetBlock!.id ? (
+                            <button
+                              onClick={() =>
+                                togglePageBreak(breakTargetBlock!.id)
+                              }
+                              className="w-full flex items-center gap-2 py-1 cursor-pointer group/btn"
+                            >
+                              <div className="flex-1 border-t-2 border-dashed border-blue-300 group-hover/btn:border-blue-400 transition-colors" />
+                              <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-blue-600 text-xs font-medium hover:bg-blue-100 hover:border-blue-300 transition-colors whitespace-nowrap">
+                                <Scissors className="h-3 w-3" />
+                                Inserir quebra de página
+                              </span>
+                              <div className="flex-1 border-t-2 border-dashed border-blue-300 group-hover/btn:border-blue-400 transition-colors" />
+                            </button>
+                          ) : (
+                            <div style={{ height: "6pt" }} />
+                          )}
+                        </div>
+                      );
+                    })()}
                 </div>
               );
             })}

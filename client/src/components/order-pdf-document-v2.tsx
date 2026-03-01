@@ -1,5 +1,6 @@
 import { Fragment } from 'react';
 import { Document, Page, Text, View, Image, StyleSheet, Font } from '@react-pdf/renderer';
+import MedSyncLogoPng from '../assets/medsync-logo-new.png';
 
 interface CidItemWithAssociation {
   cid: {
@@ -117,7 +118,7 @@ Font.register({
 const styles = StyleSheet.create({
   page: {
     paddingTop: 95,
-    paddingBottom: 55,
+    paddingBottom: 40,
     paddingHorizontal: 20,
     fontFamily: 'Helvetica',
     fontSize: 9,
@@ -146,7 +147,7 @@ const styles = StyleSheet.create({
   },
   fixedFooter: {
     position: 'absolute',
-    bottom: 15,
+    bottom: 0,
     left: 20,
     right: 20,
     height: 40,
@@ -157,6 +158,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+  },
+  footerLeft: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  footerLogoImg: {
+    width: 40,
+    height: 13,
+    objectFit: 'contain',
+  },
+  footerCenter: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  footerRight: {
+    flex: 1,
+    alignItems: 'flex-end',
   },
   footerText: {
     fontSize: 8,
@@ -212,13 +232,15 @@ const styles = StyleSheet.create({
   justificationText: {
     fontSize: 9,
     color: '#000000',
-    lineHeight: 1.4,
+    lineHeight: 1.6,
     textAlign: 'justify',
-    marginBottom: 15,
+    marginBottom: 0,
     paddingHorizontal: 5,
+    wordBreak: 'break-all',
   },
   procedureInfoRow: {
     flexDirection: 'row',
+    marginTop: 15,
     marginBottom: 15,
     gap: 20,
     paddingHorizontal: 5,
@@ -345,6 +367,13 @@ const parsePorteValue = (porte: string | null | undefined): number => {
   return (numero * 100) + (letra.charCodeAt(0) - 'A'.charCodeAt(0) + 1);
 };
 
+const breakLongWords = (text: string, maxLen = 50): string =>
+  text.split(' ').map(word =>
+    word.length <= maxLen
+      ? word
+      : (word.match(new RegExp(`.{1,${maxLen}}`, 'g')) ?? [word]).join('\u200B')
+  ).join(' ');
+
 const parseMarkdownToPdf = (text: string): { type: 'text' | 'listItem'; segments: { text: string; bold?: boolean; italic?: boolean }[] }[] => {
   const lines = text.split('\n');
   return lines.filter(line => line.trim()).map(line => {
@@ -356,17 +385,17 @@ const parseMarkdownToPdf = (text: string): { type: 'text' | 'listItem'; segments
     let match;
     while ((match = boldItalicRegex.exec(cleanLine)) !== null) {
       if (match.index > lastIndex) {
-        segments.push({ text: cleanLine.slice(lastIndex, match.index) });
+        segments.push({ text: breakLongWords(cleanLine.slice(lastIndex, match.index)) });
       }
-      if (match[1]) segments.push({ text: match[1], bold: true, italic: true });
-      else if (match[2]) segments.push({ text: match[2], bold: true });
-      else if (match[3]) segments.push({ text: match[3], italic: true });
+      if (match[1]) segments.push({ text: breakLongWords(match[1]), bold: true, italic: true });
+      else if (match[2]) segments.push({ text: breakLongWords(match[2]), bold: true });
+      else if (match[3]) segments.push({ text: breakLongWords(match[3]), italic: true });
       lastIndex = match.index + match[0].length;
     }
     if (lastIndex < cleanLine.length) {
-      segments.push({ text: cleanLine.slice(lastIndex) });
+      segments.push({ text: breakLongWords(cleanLine.slice(lastIndex)) });
     }
-    if (segments.length === 0) segments.push({ text: cleanLine });
+    if (segments.length === 0) segments.push({ text: breakLongWords(cleanLine) });
     return { type: isListItem ? 'listItem' : 'text', segments };
   });
 };
@@ -549,12 +578,20 @@ export function OrderPDFDocumentV2({
 
   const PageFooter = () => (
     <View style={styles.fixedFooter} fixed>
-      <Text style={styles.footerText}>
-        Pedido #{orderId} - Gerado em {new Date().toLocaleDateString('pt-BR')}
-      </Text>
-      <Text style={styles.pageNumber} render={({ pageNumber, totalPages }) => 
-        `Página ${pageNumber} de ${totalPages}`
-      } />
+      <View style={styles.footerLeft}>
+        <Image style={styles.footerLogoImg} src={MedSyncLogoPng} />
+        <Text style={styles.footerText}>v2.5.3</Text>
+      </View>
+      <View style={styles.footerCenter}>
+        <Text style={styles.footerText}>
+          {orderId ? `Pedido #${orderId}` : ''} - Gerado em {new Date().toLocaleDateString('pt-BR')}
+        </Text>
+      </View>
+      <View style={styles.footerRight}>
+        <Text style={styles.pageNumber} render={({ pageNumber, totalPages }) =>
+          `Página ${pageNumber} de ${totalPages}`
+        } />
+      </View>
     </View>
   );
 
@@ -640,7 +677,7 @@ export function OrderPDFDocumentV2({
               </Text>{paragraphs.map((paragraph, index) => (
                 <View 
                   key={index} 
-                  style={{ marginBottom: 8 }}
+                  style={{ marginBottom: 7 }}
                   break={shouldBreakBefore(`justification-paragraph-${index}`)}
                 >
                   {parseMarkdownToPdf(paragraph).map((line, idx) => (
