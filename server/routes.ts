@@ -2,7 +2,6 @@ import { Express, Request, Response, NextFunction } from "express";
 import { createServer, Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, hasPermission, isAuthenticated, checkTrialStatus } from "./auth";
-import { sendOrderEmail } from "./sendgrid";
 import Stripe from "stripe";
 import { WHATSAPP_CONFIG, N8N_WEBHOOKS } from "../shared/config";
 
@@ -8721,37 +8720,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Erro ao adicionar nota:', error);
       res.status(500).json({ error: "Erro interno do servidor" });
-    }
-  });
-
-  // Enviar pedido por email com PDF anexado
-  app.post('/api/medical-orders/:id/send-email', isAuthenticated, async (req: Request, res: Response) => {
-    try {
-      const orderId = parseInt(req.params.id);
-      const { recipients, pdfBase64, pdfFilename, patientName } = req.body;
-
-      if (isNaN(orderId)) return res.status(400).json({ error: 'ID inválido' });
-      if (!recipients || !Array.isArray(recipients) || recipients.length === 0) {
-        return res.status(400).json({ error: 'Nenhum destinatário informado' });
-      }
-      if (!pdfBase64) return res.status(400).json({ error: 'PDF não fornecido' });
-
-      const user = req.user as any;
-      const senderName = user?.name || user?.username || 'Médico';
-
-      const result = await sendOrderEmail(
-        recipients,
-        orderId,
-        patientName || `Pedido #${orderId}`,
-        pdfBase64,
-        pdfFilename || `pedido_${orderId}.pdf`,
-        senderName
-      );
-
-      return res.json(result);
-    } catch (error: any) {
-      console.error('[send-email] Erro:', error?.message);
-      return res.status(500).json({ error: 'Erro ao enviar email' });
     }
   });
 
